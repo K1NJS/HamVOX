@@ -1,6 +1,6 @@
 # HamVOX
 
-HamVOX is a self-hosted radio recorder for Docker-based Ubuntu installs. Plug a ham radio or scanner audio output into your computer, then use HamVOX to stream live audio, save timestamped recordings, manage multiple radios, and control everything from a web UI.
+HamVOX is a self-hosted radio recorder Docker app. Plug a ham radio or scanner audio output into your computer, then use HamVOX to stream live audio, save timestamped recordings, manage multiple radios, and control everything from a web UI.
 
 ## Screenshots
 
