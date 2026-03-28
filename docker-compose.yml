@@ -1,0 +1,97 @@
+services:
+  hamvox-app:
+    build:
+      context: .
+      dockerfile: docker/hamvox-app.Dockerfile
+    container_name: hamvox-app
+    ports:
+      - "${HAMVOX_APP_PORT:-8080}:8080"
+    environment:
+      HAMVOX_APP_HOST: ${HAMVOX_APP_HOST:-0.0.0.0}
+      HAMVOX_APP_PORT: ${HAMVOX_APP_PORT:-8080}
+      HAMVOX_RECORDINGS_ROOT: ${HAMVOX_RECORDINGS_ROOT:-/recordings}
+      HAMVOX_ARCHIVE_ROOT: ${HAMVOX_ARCHIVE_ROOT:-/recordings/archive}
+      HAMVOX_SETTINGS_PATH: ${HAMVOX_SETTINGS_PATH:-/recordings/.radio-recorder-app/application-settings.json}
+      ICECAST_SERVICE_HOST: hamvox-icecast
+      ICECAST_SERVICE_PORT: "8000"
+      ICECAST_SOURCE_MOUNT: radio.mp3
+      HAMVOX_TIMEZONE: ${HAMVOX_TIMEZONE:-America/New_York}
+      HAMVOX_ADMIN_USERNAME: ${HAMVOX_ADMIN_USERNAME:-admin}
+      HAMVOX_ADMIN_PASSWORD: ${HAMVOX_ADMIN_PASSWORD:-}
+      HAMVOX_PROTECT_PUBLIC: ${HAMVOX_PROTECT_PUBLIC:-false}
+      TZ: ${HAMVOX_TIMEZONE:-America/New_York}
+    devices:
+      - /dev/snd:/dev/snd
+    ipc: host
+    volumes:
+      - ./src:/app/src:ro
+      - ${HAMVOX_RECORDINGS_ROOT_HOST:-./recordings}:/recordings
+    restart: unless-stopped
+    depends_on:
+      - hamvox-icecast
+
+  hamvox-source:
+    build:
+      context: .
+      dockerfile: docker/hamvox-app.Dockerfile
+    container_name: hamvox-source
+    command: ["python", "-m", "backend.services.live_audio_source_service"]
+    environment:
+      HAMVOX_RECORDINGS_ROOT: ${HAMVOX_RECORDINGS_ROOT:-/recordings}
+      HAMVOX_ARCHIVE_ROOT: ${HAMVOX_ARCHIVE_ROOT:-/recordings/archive}
+      HAMVOX_SETTINGS_PATH: ${HAMVOX_SETTINGS_PATH:-/recordings/.radio-recorder-app/application-settings.json}
+      HAMVOX_TIMEZONE: ${HAMVOX_TIMEZONE:-America/New_York}
+      TZ: ${HAMVOX_TIMEZONE:-America/New_York}
+      ICECAST_SOURCE_PASSWORD: ${ICECAST_SOURCE_PASSWORD:-change-me-source}
+      ICECAST_SERVICE_HOST: hamvox-icecast
+      ICECAST_SERVICE_PORT: "8000"
+      ICECAST_SOURCE_MOUNT: radio.mp3
+    devices:
+      - /dev/snd:/dev/snd
+    ipc: host
+    volumes:
+      - ./src:/app/src:ro
+      - ${HAMVOX_RECORDINGS_ROOT_HOST:-./recordings}:/recordings
+    restart: unless-stopped
+    depends_on:
+      - hamvox-icecast
+
+  hamvox-capture:
+    build:
+      context: .
+      dockerfile: docker/hamvox-app.Dockerfile
+    container_name: hamvox-capture
+    command: ["python", "-m", "backend.services.audio_capture_recording_service"]
+    environment:
+      HAMVOX_RECORDINGS_ROOT: ${HAMVOX_RECORDINGS_ROOT:-/recordings}
+      HAMVOX_ARCHIVE_ROOT: ${HAMVOX_ARCHIVE_ROOT:-/recordings/archive}
+      HAMVOX_SETTINGS_PATH: ${HAMVOX_SETTINGS_PATH:-/recordings/.radio-recorder-app/application-settings.json}
+      HAMVOX_TIMEZONE: ${HAMVOX_TIMEZONE:-America/New_York}
+      TZ: ${HAMVOX_TIMEZONE:-America/New_York}
+    devices:
+      - /dev/snd:/dev/snd
+    ipc: host
+    volumes:
+      - ./src:/app/src:ro
+      - ${HAMVOX_RECORDINGS_ROOT_HOST:-./recordings}:/recordings
+    restart: unless-stopped
+
+  hamvox-icecast:
+    build:
+      context: .
+      dockerfile: docker/hamvox-icecast.Dockerfile
+    container_name: hamvox-icecast
+    environment:
+      ICECAST_HOSTNAME: ${ICECAST_HOSTNAME:-localhost}
+      ICECAST_LOCATION: ${ICECAST_LOCATION:-HamVOX Host}
+      ICECAST_ADMIN: ${ICECAST_ADMIN:-radio@localhost}
+      ICECAST_SOURCE_PASSWORD: ${ICECAST_SOURCE_PASSWORD:-change-me-source}
+      ICECAST_RELAY_PASSWORD: ${ICECAST_RELAY_PASSWORD:-change-me-relay}
+      ICECAST_ADMIN_PASSWORD: ${ICECAST_ADMIN_PASSWORD:-change-me-admin}
+      ICECAST_STREAM_NAME: ${ICECAST_STREAM_NAME:-HamVOX Radio Stream}
+      ICECAST_STREAM_DESCRIPTION: ${ICECAST_STREAM_DESCRIPTION:-Self-hosted HamVOX live radio stream}
+      ICECAST_STREAM_GENRE: ${ICECAST_STREAM_GENRE:-Scanner}
+      TZ: ${HAMVOX_TIMEZONE:-America/New_York}
+    ports:
+      - "${ICECAST_PORT:-8000}:8000"
+    restart: unless-stopped

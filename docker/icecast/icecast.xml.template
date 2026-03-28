@@ -1,0 +1,64 @@
+<icecast>
+  <location>${ICECAST_LOCATION}</location>
+  <admin>${ICECAST_ADMIN}</admin>
+
+  <limits>
+    <clients>100</clients>
+    <sources>10</sources>
+    <queue-size>524288</queue-size>
+    <client-timeout>30</client-timeout>
+    <header-timeout>15</header-timeout>
+    <source-timeout>10</source-timeout>
+    <burst-on-connect>1</burst-on-connect>
+    <burst-size>65535</burst-size>
+  </limits>
+
+  <authentication>
+    <source-password>${ICECAST_SOURCE_PASSWORD}</source-password>
+    <relay-password>${ICECAST_RELAY_PASSWORD}</relay-password>
+    <admin-user>admin</admin-user>
+    <admin-password>${ICECAST_ADMIN_PASSWORD}</admin-password>
+  </authentication>
+
+  <hostname>${ICECAST_HOSTNAME}</hostname>
+  <listen-socket>
+    <port>8000</port>
+  </listen-socket>
+
+  <mount>
+    <mount-name>/radio.mp3</mount-name>
+    <stream-name>${ICECAST_STREAM_NAME}</stream-name>
+    <stream-description>${ICECAST_STREAM_DESCRIPTION}</stream-description>
+    <genre>${ICECAST_STREAM_GENRE}</genre>
+    <http-headers>
+      <header name="Access-Control-Allow-Origin" value="*" />
+      <header name="Access-Control-Allow-Headers" value="Origin, Range, Accept, Content-Type" />
+      <header name="Access-Control-Expose-Headers" value="Content-Length, Content-Range" />
+      <header name="Cache-Control" value="no-store, no-cache, must-revalidate, max-age=0" />
+    </http-headers>
+  </mount>
+
+  <fileserve>1</fileserve>
+
+  <paths>
+    <basedir>/usr/share/icecast2</basedir>
+    <logdir>/var/log/icecast</logdir>
+    <webroot>/usr/share/icecast2/web</webroot>
+    <adminroot>/usr/share/icecast2/admin</adminroot>
+    <alias source="/" destination="/status.xsl"/>
+  </paths>
+
+  <logging>
+    <accesslog>access.log</accesslog>
+    <errorlog>error.log</errorlog>
+    <loglevel>3</loglevel>
+  </logging>
+
+  <security>
+    <chroot>0</chroot>
+    <changeowner>
+      <user>icecast2</user>
+      <group>icecast2</group>
+    </changeowner>
+  </security>
+</icecast>

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HamVOX Files</title>
+  <style>
+    :root { --bg:#000; --card:#111; --muted:#8aa0b2; --fg:#e5eef7; --accent:#4da3ff; --line:#1f2a38; --ok:#7cf0c7; --warn:#ffb27a; }
+    html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Helvetica,Arial}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    header{border-bottom:1px solid #1e2228;background:linear-gradient(180deg, rgba(5,7,9,.95), rgba(5,7,9,.75));backdrop-filter:saturate(140%) blur(10px)}
+    .container{max-width:1100px;margin:0 auto;padding:0 1rem 2rem}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 0}
+    .brand{display:flex;align-items:baseline;gap:.75rem;flex-wrap:wrap}.callsign{font-weight:800;letter-spacing:.06em;font-size:1.7rem;line-height:1}.tagline{color:var(--muted)}
+    .topnav{display:flex;gap:.5rem;flex-wrap:wrap}.topnav a{background:#0f1620;border:1px solid #2a394a;color:#9cc6ff;border-radius:999px;padding:.35rem .7rem}
+    .card{background:linear-gradient(180deg,#0d1014,#0b0d10);border:1px solid #1f2a38;border-radius:14px;padding:1rem;box-shadow:0 1px 0 #000,0 0 0 1px rgba(255,255,255,.03) inset;margin-top:1rem}
+    .title{font-weight:700;color:#cfe4ff;font-size:1.1rem}.muted{color:var(--muted)} .badge{display:inline-block;border:1px solid #2a394a;border-radius:999px;padding:.15rem .45rem;font-size:.75rem;color:var(--muted)} .badge.ok{color:var(--ok);border-color:#2e5a45}
+    .toolbar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-top:.8rem}
+    .btn{background:#0f0f11;color:var(--fg);border:1px solid #1e2228;border-radius:.6rem;padding:.55rem .7rem;cursor:pointer}.btn:hover{background:#14161a}.btn.warn{border-color:#5a422e;color:#ffcf9f}
+    .breadcrumbs{display:flex;flex-wrap:wrap;gap:.25rem .35rem}.breadcrumbs .sep{color:#3b4b5c}
+    .list{display:grid;gap:.55rem;margin-top:1rem}
+    .row{display:grid;grid-template-columns:26px minmax(0,1fr) auto auto auto;gap:.75rem;align-items:center;background:#111;border:1px solid #1e2228;border-radius:12px;padding:.8rem .9rem}
+    .row input[type="checkbox"]{width:16px;height:16px}
+    .row .name{min-width:0}
+    .row .meta{color:var(--muted);font-size:.88rem}
+    .empty{background:#101010;border:1px solid #222;border-radius:12px;padding:.8rem}
+    @media (max-width:760px){.row{grid-template-columns:26px minmax(0,1fr);}.row .meta,.row .size,.row .actions{grid-column:2}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="topbar">
+        <div class="brand"><div class="callsign" id="siteCallsign">HamVOX</div><div class="tagline" id="siteTagline">Live & Archived Radio Recordings</div></div>
+        <nav class="topnav"><a href="/">Home</a><a href="/settings">Settings</a></nav>
+      </div>
+    </div>
+  </header>
+  <div class="container">
+    <section class="card">
+      <div class="title">Files</div>
+      <div class="muted" style="margin-top:.35rem">Browse, select, and delete raw recording folders or files. This page is protected separately from the public homepage.</div>
+      <div class="toolbar">
+        <div class="breadcrumbs" id="breadcrumbs"></div>
+        <span class="badge" id="selectionBadge">0 selected</span>
+        <span class="muted" id="status">Loading…</span>
+      </div>
+      <div class="toolbar">
+        <button class="btn" id="selectAllBtn" type="button">Select All</button>
+        <button class="btn" id="clearSelectionBtn" type="button">Clear Selection</button>
+        <button class="btn warn" id="deleteSelectedBtn" type="button">Delete Selected</button>
+        <button class="btn warn" id="clearAllBtn" type="button">Clear All Recordings</button>
+      </div>
+      <div class="list" id="list"></div>
+    </section>
+  </div>
+  <script>
+    const SITE_CACHE_KEY = 'rr.siteContent.v1';
+    const DEFAULT_SITE_CALLSIGN = 'HamVOX';
+    const DEFAULT_SITE_TAGLINE = 'Live & Archived Radio Recordings';
+    const qs = (s, e = document) => e.querySelector(s);
+    const qsa = (s, e = document) => [...e.querySelectorAll(s)];
+    const listEl = qs('#list');
+    const statusEl = qs('#status');
+    const breadcrumbsEl = qs('#breadcrumbs');
+    const selectionBadge = qs('#selectionBadge');
+    const siteCallsignEl = qs('#siteCallsign');
+    const siteTaglineEl = qs('#siteTagline');
+    const state = { cwd: '/', selected: new Set() };
+
+    async function fetchJson(path, options = {}) {
+      const response = await fetch(path, options);
+      if (!response.ok) throw new Error(`${path} returned ${response.status}`);
+      return response.json();
+    }
+
+    function loadCachedSiteContent() {
+      try {
+        const payload = JSON.parse(localStorage.getItem(SITE_CACHE_KEY) || '{}');
+        return payload && typeof payload === 'object' ? payload : {};
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function saveCachedSiteContent(payload) {
+      try {
+        localStorage.setItem(SITE_CACHE_KEY, JSON.stringify(payload));
+      } catch (_) {}
+    }
+
+    function readSiteValue(payload, key, fallback) {
+      if (!payload || !Object.prototype.hasOwnProperty.call(payload, key) || payload[key] === null || payload[key] === undefined) {
+        return fallback;
+      }
+      return String(payload[key]);
+    }
+
+    function renderSiteHeader(payload) {
+      if (!payload) return;
+      const callsign = readSiteValue(payload, 'site_callsign', DEFAULT_SITE_CALLSIGN);
+      const tagline = readSiteValue(payload, 'site_tagline', DEFAULT_SITE_TAGLINE);
+      siteCallsignEl.textContent = callsign;
+      siteTaglineEl.textContent = tagline;
+      saveCachedSiteContent({
+        site_callsign: callsign,
+        site_tagline: tagline,
+      });
+    }
+
+    function updateSelectionBadge() {
+      selectionBadge.textContent = `${state.selected.size} selected`;
+    }
+
+    function renderBreadcrumbs(path) {
+      const parts = path.split('/').filter(Boolean);
+      const items = [{ label: 'Files', path: '/' }];
+      let current = '';
+      for (const part of parts) {
+        current += `/${part}`;
+        items.push({ label: part, path: current });
+      }
+      breadcrumbsEl.innerHTML = items.map((item, index) => {
+        const link = `<a href="#" data-path="${item.path}">${item.label}</a>`;
+        return index === 0 ? link : `<span class="sep">/</span>${link}`;
+      }).join('');
+      qsa('a', breadcrumbsEl).forEach((link) => link.addEventListener('click', async (event) => {
+        event.preventDefault();
+        await loadDirectory(link.dataset.path);
+      }));
+    }
+
+    function formatSize(bytes) {
+      if (!bytes) return '';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      let size = bytes;
+      let i = 0;
+      while (size >= 1024 && i < units.length - 1) {
+        size /= 1024;
+        i += 1;
+      }
+      return `${size.toFixed(size >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+    }
+
+    function formatTimestamp(value) {
+      return value ? new Date(value * 1000).toLocaleString() : '';
+    }
+
+    function sortItems(items) {
+      return [...items].sort((a, b) => {
+        const rank = (item) => (item.type === 'dir' ? 0 : 1);
+        const rankDiff = rank(a) - rank(b);
+        if (rankDiff !== 0) return rankDiff;
+        return (b.mtime || 0) - (a.mtime || 0);
+      });
+    }
+
+    function renderList(items) {
+      listEl.innerHTML = '';
+      if (!items.length) {
+        listEl.innerHTML = '<div class="empty">No files in this folder.</div>';
+        return;
+      }
+
+      if (state.cwd !== '/') {
+        const upRow = document.createElement('div');
+        upRow.className = 'row';
+        upRow.innerHTML = '<div></div><div class="name"><strong>..</strong><div class="meta">Up one level</div></div><div class="meta"></div><div class="size"></div><div class="actions"><button class="btn" type="button">Open</button></div>';
+        upRow.addEventListener('click', async () => {
+          const parts = state.cwd.split('/').filter(Boolean);
+          parts.pop();
+          const parent = parts.length ? `/${parts.join('/')}` : '/';
+          await loadDirectory(parent);
+        });
+        listEl.appendChild(upRow);
+      }
+
+      for (const item of sortItems(items)) {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.dataset.path = item.path;
+        row.innerHTML = `
+          <input type="checkbox" />
+          <div class="name"><strong>${item.name}</strong><div class="meta">${item.type === 'dir' ? 'Folder' : formatTimestamp(item.mtime)}</div></div>
+          <div class="meta">${item.type === 'dir' ? 'Folder' : 'File'}</div>
+          <div class="size">${item.type === 'dir' ? '' : formatSize(item.size)}</div>
+          <div class="actions"><button class="btn" type="button">${item.type === 'dir' ? 'Open' : 'Delete'}</button></div>
+        `;
+        const checkbox = row.querySelector('input[type="checkbox"]');
+        checkbox.checked = state.selected.has(item.path);
+        checkbox.addEventListener('click', (event) => event.stopPropagation());
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) state.selected.add(item.path);
+          else state.selected.delete(item.path);
+          updateSelectionBadge();
+        });
+        row.querySelector('.btn').addEventListener('click', async (event) => {
+          event.stopPropagation();
+          if (item.type === 'dir') await loadDirectory(item.path);
+          else await deletePaths([item.path]);
+        });
+        row.addEventListener('click', async () => {
+          if (item.type === 'dir') await loadDirectory(item.path);
+          else checkbox.click();
+        });
+        listEl.appendChild(row);
+      }
+    }
+
+    async function loadDirectory(path = '/') {
+      statusEl.textContent = `Loading ${path}…`;
+      const payload = await fetchJson(`/api/files/list?path=${encodeURIComponent(path)}`);
+      state.cwd = payload.cwd;
+      renderBreadcrumbs(payload.cwd);
+      renderList(payload.items);
+      statusEl.textContent = `${payload.items.length} item${payload.items.length === 1 ? '' : 's'}`;
+      updateSelectionBadge();
+    }
+
+    async function deletePaths(paths) {
+      if (!paths.length) return;
+      statusEl.textContent = 'Deleting…';
+      const payload = await fetchJson('/api/files/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paths }),
+      });
+      for (const path of payload.deleted_paths) state.selected.delete(path);
+      await loadDirectory(state.cwd);
+      statusEl.textContent = payload.message;
+    }
+
+    qs('#selectAllBtn').addEventListener('click', () => {
+      qsa('.row[data-path]', listEl).forEach((row) => {
+        state.selected.add(row.dataset.path);
+        row.querySelector('input[type="checkbox"]').checked = true;
+      });
+      updateSelectionBadge();
+    });
+
+    qs('#clearSelectionBtn').addEventListener('click', () => {
+      state.selected.clear();
+      qsa('input[type="checkbox"]', listEl).forEach((checkbox) => { checkbox.checked = false; });
+      updateSelectionBadge();
+    });
+
+    qs('#deleteSelectedBtn').addEventListener('click', async () => {
+      if (!state.selected.size) return;
+      if (!confirm(`Delete ${state.selected.size} selected item(s)?`)) return;
+      await deletePaths([...state.selected]);
+    });
+
+    qs('#clearAllBtn').addEventListener('click', async () => {
+      if (!confirm('Clear all recordings and folders?')) return;
+      statusEl.textContent = 'Clearing archive…';
+      const payload = await fetchJson('/api/files/clear', { method: 'POST' });
+      state.selected.clear();
+      await loadDirectory('/');
+      statusEl.textContent = payload.message;
+    });
+
+    (async () => {
+      try {
+        renderSiteHeader(loadCachedSiteContent());
+        const siteContent = await fetchJson('/api/site-content');
+        renderSiteHeader(siteContent);
+        await loadDirectory('/');
+      } catch (error) {
+        statusEl.textContent = `Startup failed: ${error.message}`;
+      }
+    })();
+  </script>
+</body>
+</html>

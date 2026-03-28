@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HamVOX</title>
+  <style>
+    :root { --bg:#000; --card:#111; --muted:#8aa0b2; --fg:#e5eef7; --accent:#4da3ff; --line:#1f2a38; --ok:#7cf0c7; --warn:#ffb27a; }
+    html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Helvetica,Arial;overflow-x:hidden;-webkit-tap-highlight-color:transparent}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    header{border-bottom:1px solid #1e2228;background:linear-gradient(180deg, rgba(5,7,9,.95), rgba(5,7,9,.75));backdrop-filter:saturate(140%) blur(10px)}
+    .container{max-width:1120px;margin:0 auto;padding:0 1rem 2rem}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 0}
+    .brand{display:flex;align-items:baseline;gap:.75rem;flex-wrap:wrap}.callsign{font-weight:800;letter-spacing:.06em;font-size:1.7rem;line-height:1}.tagline{color:var(--muted)}
+    .topnav{display:flex;gap:.5rem;flex-wrap:wrap}.topnav a{background:#0f1620;border:1px solid #2a394a;color:#9cc6ff;border-radius:999px;padding:.35rem .7rem}
+    .card{background:linear-gradient(180deg,#0d1014,#0b0d10);border:1px solid #1f2a38;border-radius:14px;padding:.85rem .95rem;box-shadow:0 1px 0 #000,0 0 0 1px rgba(255,255,255,.03) inset}
+    .infocard{margin:.9rem 0 1rem;padding:1rem 1.05rem}
+    .infocard-title{font-size:1.02rem;font-weight:700;color:#d8e8fb;margin:0 0 .35rem}
+    .infocard-copy{color:var(--muted);margin:0;max-width:72ch}
+    .live-grid{display:grid;gap:.8rem;margin:1rem 0 .8rem}
+    .livecard{display:grid;grid-template-columns:1fr auto;align-items:center;gap:.8rem}.liveleft{display:flex;align-items:center;gap:.9rem;min-width:0}
+    .signal{display:flex;align-items:center;gap:.5rem;padding:.45rem .6rem;background:#0b0f15;border:1px solid #1d2532;border-radius:999px;transition:border-color .22s ease, box-shadow .22s ease, background-color .22s ease}
+    .dot{width:.6rem;height:.6rem;border-radius:50%;background:#d34;transition:background-color .22s ease, box-shadow .22s ease, transform .22s ease}
+    .eq{display:flex;gap:2px;height:16px}
+    .eq span{width:3px;background:#2ee36f;opacity:.28;transform-origin:bottom center;animation:equalizerIdle 1.6s ease-in-out infinite}
+    .eq span:nth-child(1){height:8px;animation-delay:0s}
+    .eq span:nth-child(2){height:14px;animation-delay:.12s}
+    .eq span:nth-child(3){height:10px;animation-delay:.24s}
+    .eq span:nth-child(4){height:16px;animation-delay:.36s}
+    .livecard.connecting .signal{border-color:#4c3b22;box-shadow:0 0 0 1px rgba(255,178,122,.08) inset;background:#15110c}
+    .livecard.connecting .dot{background:#ffb27a;box-shadow:0 0 0 8px rgba(255,178,122,.12);animation:livePulse 1.15s ease-in-out infinite}
+    .livecard.connecting .eq span{opacity:.78;animation:equalizerBusy .75s ease-in-out infinite}
+    .livecard.playing .signal{border-color:#244b38;box-shadow:0 0 0 1px rgba(124,240,199,.08) inset,0 0 18px rgba(46,227,111,.08);background:#0d1712;animation:signalGlow 1.8s ease-in-out infinite}
+    .livecard.playing .dot{background:#2ee36f;box-shadow:0 0 0 8px rgba(46,227,111,.12),0 0 14px rgba(46,227,111,.2);animation:livePulse .95s ease-in-out infinite}
+    .livecard.playing .eq span{opacity:.92;animation:equalizerBusy .72s ease-in-out infinite}
+    @keyframes livePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.16)}}
+    @keyframes equalizerIdle{0%,100%{transform:scaleY(.42)}50%{transform:scaleY(.58)}}
+    @keyframes equalizerBusy{0%,100%{transform:scaleY(.35)}25%{transform:scaleY(1)}50%{transform:scaleY(.5)}75%{transform:scaleY(.88)}}
+    @keyframes signalGlow{0%,100%{box-shadow:0 0 0 1px rgba(124,240,199,.08) inset,0 0 10px rgba(46,227,111,.06)}50%{box-shadow:0 0 0 1px rgba(124,240,199,.16) inset,0 0 22px rgba(46,227,111,.12)}}
+    .title{font-weight:700;letter-spacing:.02em}.meta,.muted{color:var(--muted)}.status-row{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}
+    .badge{display:inline-block;border:1px solid #2a394a;border-radius:999px;padding:.15rem .45rem;font-size:.75rem;color:var(--muted)} .badge.ok{color:var(--ok);border-color:#2e5a45}.badge.warn{color:var(--warn);border-color:#5a422e}
+    .controls{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}.btn{background:#0f0f11;color:var(--fg);border:1px solid #1e2228;border-radius:.6rem;padding:.55rem .7rem;cursor:pointer}.btn:hover{background:#14161a}
+    .vol{appearance:none;width:120px;height:6px;border-radius:999px;background:#0e0e0e;border:1px solid #222}
+    .toolbar{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;margin:.5rem 0 1rem;background:#000;border:1px solid #1e2228;border-radius:12px;padding:.55rem .65rem}
+    .breadcrumbs{display:flex;flex-wrap:wrap;gap:.25rem .35rem}.breadcrumbs .sep{color:#3b4b5c}
+    .grid.row{display:flex;align-items:center;gap:.6rem;background:#111;border:1px solid #1e2228;border-radius:12px;padding:.75rem .9rem;box-shadow:0 1px 0 #000,0 0 0 1px rgba(255,255,255,.02) inset;cursor:pointer;touch-action:pan-y}.grid.row+.grid.row{margin-top:.4rem}.grid.row:hover{background:#141419;border-color:#2a2f37}
+    .grid.row.playing{outline:2px solid #2e5a45;box-shadow:0 0 0 3px rgba(46,90,69,.25) inset}
+    .icon,.mtime,.size{display:none!important}.name{flex:0 0 150px;min-width:150px}.name .sub{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.22rem;color:var(--muted);font-size:.82em;line-height:1.2}.played{margin-left:auto;display:flex;align-items:center;gap:.45rem}.actions{display:flex;gap:.35rem;flex-wrap:wrap}
+    .name a,.row-link{display:inline-block;text-decoration:none;color:var(--fg);cursor:pointer;touch-action:manipulation} .name a:hover,.row-link:hover{text-decoration:none;color:var(--accent)}
+    .disclosure{cursor:pointer;user-select:none;display:inline-block;width:1.2rem;color:#9cc6ff}
+    .childlist{margin:.25rem 0 .5rem 1.6rem;border-left:1px dashed #222;padding-left:.8rem}
+    .hidden{display:none!important}
+    .pill{display:inline-block;border:1px solid #2a394a;border-radius:999px;padding:.15rem .45rem;font-size:.75rem;color:#9cc6ff;background:#0f1620}
+    .meta-pill{display:inline-block;border:1px solid #243142;border-radius:999px;padding:.12rem .42rem;font-size:.72rem;color:#b9d6f2;background:#0f1620}
+    .meta-pill.seq{color:#ffd27a;border-color:#5f4d27;background:#171209}
+    .col-played{display:flex;align-items:center;gap:.45rem}
+    .col-played .filesum{color:var(--muted);font-size:.9em}
+    .col-played .filesum .sep-dot{opacity:.7}
+    .playbtn{min-width:74px}
+    .inrow-player{display:flex;align-items:center;gap:.55rem;flex:0 0 auto;max-width:420px;margin:0 0 0 .35rem}
+    .inrow-player .time{color:var(--muted);font-variant-numeric:tabular-nums;font-size:.83rem;min-width:38px}
+    .inrow-player .seek{appearance:none;flex:0 1 280px;width:280px;max-width:280px;height:4px;border-radius:999px;background:#0e0f11;border:1px solid #222}
+    .inrow-player .seek::-webkit-slider-thumb{appearance:none;width:13px;height:13px;border-radius:50%;background:#4da3ff}
+    .inrow-player .seek::-moz-range-thumb{width:13px;height:13px;border:none;border-radius:50%;background:#4da3ff}
+    .empty{background:#101010;border:1px solid #222;border-radius:12px;padding:.8rem}.section-title{font-size:1rem;color:#cfe4ff;font-weight:650;margin:0 0 .35rem}
+    @media (max-width:900px){.livecard{grid-template-columns:1fr}}
+    @media (max-width:640px){
+      .container{padding:0 .7rem 1.2rem}
+      .callsign{font-size:1.4rem}
+      .topbar{align-items:flex-start}
+      .topnav{gap:.35rem;width:100%}
+      .topnav a{padding:.22rem .52rem;font-size:.84rem}
+      .hero{padding:.85rem}
+      .facts{grid-template-columns:1fr}
+      .livecard{padding:.7rem}
+      .controls{justify-content:flex-start}
+      .childlist{margin:.2rem 0 .45rem .7rem;padding-left:.55rem}
+      .grid.row{flex-wrap:wrap;align-items:flex-start;padding:.7rem}
+      .name{flex:1 1 calc(100% - 64px);min-width:0}
+      .played{order:3;width:100%;margin-left:0;justify-content:flex-start;flex-wrap:wrap}
+      .inrow-player{order:2;flex:1 1 100%;max-width:none;width:100%;margin:.35rem 0 0}
+      .inrow-player .seek{flex:1 1 auto;width:auto;max-width:none}
+      .actions{order:4;width:100%;justify-content:flex-start}
+      .btn,.playbtn{min-width:auto}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="topbar">
+        <div class="brand">
+          <div class="callsign" id="siteCallsign">HamVOX</div>
+          <div class="tagline" id="siteTagline">Live & Archived Radio Recordings</div>
+        </div>
+        <nav class="topnav">
+          <a href="/settings">Settings</a>
+          <a href="/files">Files</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="card infocard" id="infoCard">
+      <div class="infocard-title" id="siteInfoTitle">About HamVOX</div>
+      <p class="infocard-copy" id="siteInfoText">HamVOX is a self-hosted radio monitoring app that lets you stream live audio, save timestamped recordings, organize multiple radio profiles, mirror archives to SMB storage, and send Discord alerts when new activity is captured.</p>
+    </div>
+
+    <section class="live-grid" id="liveStreams"></section>
+
+    <section id="recordingsSection">
+      <div class="toolbar">
+        <div class="breadcrumbs" id="breadcrumbs"></div>
+        <span class="muted" id="status"></span>
+      </div>
+      <div id="list"></div>
+    </section>
+  </div>
+
+  <template id="rowT">
+    <div class="grid row" data-type="" data-cwd="" data-name="">
+      <div class="icon"></div><div class="name"></div><div class="mtime muted"></div><div class="size muted"></div><div class="played"></div><div class="actions"></div>
+    </div>
+  </template>
+
+  <script>
+    const SITE_CACHE_KEY = 'rr.siteContent.v1';
+    const DEFAULT_SITE_CALLSIGN = 'HamVOX';
+    const DEFAULT_SITE_TAGLINE = 'Live & Archived Radio Recordings';
+    const DEFAULT_SITE_INFO_TITLE = 'About HamVOX';
+    const DEFAULT_SITE_INFO_TEXT = 'HamVOX is a self-hosted radio monitoring app that lets you stream live audio, save timestamped recordings, organize multiple radio profiles, mirror archives to SMB storage, and send Discord alerts when new activity is captured.';
+    const qs = (s, e = document) => e.querySelector(s);
+    const qsa = (s, e = document) => [...e.querySelectorAll(s)];
+    const state = { activeRecordingKey: null, playlistToken: 0, livePlayers: new Map(), siteContent: null };
+    const listEl = qs('#list');
+    const rowT = qs('#rowT');
+    const statusEl = qs('#status');
+    const crumbsEl = qs('#breadcrumbs');
+    const liveStreamsEl = qs('#liveStreams');
+    const siteCallsign = qs('#siteCallsign');
+    const siteTagline = qs('#siteTagline');
+    const siteInfoTitle = qs('#siteInfoTitle');
+    const siteInfoText = qs('#siteInfoText');
+    let activeRecordingAudio = null;
+
+    const LS_PLAY_KEY = 'rr.playstate.v2';
+    let playMap = loadPlayMap();
+
+    async function fetchJson(path, options = {}) {
+      const response = await fetch(path, options);
+      if (!response.ok) throw new Error(`${path} returned ${response.status}`);
+      return response.json();
+    }
+
+    function loadPlayMap() {
+      try {
+        const payload = JSON.parse(localStorage.getItem(LS_PLAY_KEY) || '{}');
+        return payload && typeof payload === 'object' ? payload : {};
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function savePlayMap() {
+      try {
+        localStorage.setItem(LS_PLAY_KEY, JSON.stringify(playMap));
+      } catch (_) {}
+    }
+
+    function loadCachedSiteContent() {
+      try {
+        const payload = JSON.parse(localStorage.getItem(SITE_CACHE_KEY) || '{}');
+        return payload && typeof payload === 'object' ? payload : {};
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function saveCachedSiteContent(payload) {
+      try {
+        localStorage.setItem(SITE_CACHE_KEY, JSON.stringify(payload));
+      } catch (_) {}
+    }
+
+    function readSiteValue(payload, key, fallback) {
+      if (!payload || !Object.prototype.hasOwnProperty.call(payload, key) || payload[key] === null || payload[key] === undefined) {
+        return fallback;
+      }
+      return String(payload[key]);
+    }
+
+    function keyFor(cwd, name) {
+      return `${cwd}\n${name}`;
+    }
+
+    function getLocalStatus(cwd, name) {
+      const value = playMap[keyFor(cwd, name)];
+      return value === 1 ? 'played' : value === 2 ? 'half' : null;
+    }
+
+    function setLocalStatus(cwd, name, type) {
+      const key = keyFor(cwd, name);
+      if (type === 'played') playMap[key] = 1;
+      else if (type === 'half') playMap[key] = 2;
+      else delete playMap[key];
+      savePlayMap();
+      refreshFolderPillForPath(cwd);
+      const parent = parentPath(cwd);
+      if (parent) refreshFolderPillForPath(parent);
+    }
+
+    function setStatus(message) {
+      statusEl.textContent = message || '';
+    }
+
+    function renderSiteContent(payload) {
+      if (!payload) return;
+      state.siteContent = payload;
+      const callsign = readSiteValue(payload, 'site_callsign', DEFAULT_SITE_CALLSIGN);
+      const tagline = readSiteValue(payload, 'site_tagline', DEFAULT_SITE_TAGLINE);
+      const infoTitle = readSiteValue(payload, 'site_info_title', DEFAULT_SITE_INFO_TITLE);
+      const infoText = readSiteValue(payload, 'site_info_text', DEFAULT_SITE_INFO_TEXT);
+      siteCallsign.textContent = callsign;
+      siteTagline.textContent = tagline;
+      siteInfoTitle.textContent = infoTitle;
+      siteInfoText.textContent = infoText;
+      const infoCard = qs('#infoCard');
+      if (infoCard) {
+        infoCard.style.display = infoTitle || infoText ? '' : 'none';
+      }
+      saveCachedSiteContent({
+        site_callsign: callsign,
+        site_tagline: tagline,
+        site_info_title: infoTitle,
+        site_info_text: infoText,
+      });
+      renderLiveStreams((payload.radios || []).filter((radio) => radio.enabled));
+    }
+
+    function formatSize(bytes) {
+      if (!bytes) return '';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      let size = bytes;
+      let i = 0;
+      while (size >= 1024 && i < units.length - 1) {
+        size /= 1024;
+        i += 1;
+      }
+      return `${size.toFixed(size >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+    }
+
+    function formatSeconds(seconds) {
+      if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+      const total = Math.floor(seconds);
+      const mins = Math.floor(total / 60);
+      const secs = String(total % 60).padStart(2, '0');
+      return `${mins}:${secs}`;
+    }
+
+    function parentPath(path) {
+      if (!path || path === '/') return null;
+      const parts = path.split('/').filter(Boolean);
+      parts.pop();
+      return parts.length ? `/${parts.join('/')}` : '/';
+    }
+
+    function renderBreadcrumbs() {
+      crumbsEl.innerHTML = '<a href="#" data-path="/">Recordings</a>';
+      qs('a', crumbsEl)?.addEventListener('click', async (event) => {
+        event.preventDefault();
+        await nav('/');
+      });
+    }
+
+    function localIcecastStreamUrl(radioId) {
+      return `${window.location.origin}/api/live-stream?radio_id=${encodeURIComponent(radioId)}`;
+    }
+
+    function ensureLivePlayer(radioId) {
+      let player = state.livePlayers.get(radioId);
+      if (player) return player;
+      const audio = new Audio();
+      audio.preload = 'none';
+      player = { audio, state: 'idle', message: '' };
+      state.livePlayers.set(radioId, player);
+      audio.addEventListener('play', () => setLiveStateForRadio(radioId, 'playing'));
+      audio.addEventListener('pause', () => {
+        const current = state.livePlayers.get(radioId);
+        if (current && current.state !== 'connecting') setLiveStateForRadio(radioId, 'idle');
+      });
+      audio.addEventListener('waiting', () => {
+        const current = state.livePlayers.get(radioId);
+        if (current && current.state === 'playing') setLiveStateForRadio(radioId, 'connecting', 'Buffering…');
+      });
+      audio.addEventListener('playing', () => setLiveStateForRadio(radioId, 'playing'));
+      audio.addEventListener('error', () => {
+        setLiveStateForRadio(radioId, 'idle', 'Stream unavailable');
+        setStatus('The browser could not load the live stream.');
+      });
+      return player;
+    }
+
+    function setLiveStateForRadio(radioId, nextState, message = '') {
+      const player = ensureLivePlayer(radioId);
+      player.state = nextState;
+      player.message = message;
+      updateLiveUiForRadio(radioId);
+    }
+
+    function updateLiveUiForRadio(radioId) {
+      const player = ensureLivePlayer(radioId);
+      const card = qs(`.livecard[data-radio-id="${CSS.escape(radioId)}"]`, liveStreamsEl);
+      if (!card) return;
+      const button = qs('.live-btn', card);
+      const status = qs('.live-status', card);
+      card.classList.toggle('connecting', player.state === 'connecting');
+      card.classList.toggle('playing', player.state === 'playing');
+      if (player.state === 'connecting') {
+        button.textContent = '… Connecting';
+        button.disabled = true;
+        status.style.display = '';
+        status.className = 'badge warn live-status';
+        status.textContent = player.message || 'Connecting…';
+        return;
+      }
+      button.disabled = false;
+      if (player.state === 'playing') {
+        button.textContent = '■ Stop';
+        status.style.display = '';
+        status.className = 'badge ok live-status';
+        status.textContent = player.message || 'Playing';
+        return;
+      }
+      button.textContent = '▶ Play';
+      if (player.message) {
+        status.style.display = '';
+        status.className = 'badge warn live-status';
+        status.textContent = player.message;
+      } else {
+        status.style.display = 'none';
+      }
+    }
+
+    function renderLiveStreams(radios) {
+      liveStreamsEl.innerHTML = '';
+      if (!radios.length) {
+        const empty = document.createElement('div');
+        empty.className = 'card';
+        empty.innerHTML = '<div class="section-title">No live radios configured.</div><div class="muted">Enable at least one radio profile in Settings to publish a live stream here.</div>';
+        liveStreamsEl.appendChild(empty);
+        return;
+      }
+      for (const radio of radios) {
+        const card = document.createElement('div');
+        card.className = 'card livecard';
+        card.dataset.radioId = radio.id;
+        card.innerHTML = `
+          <div class="liveleft">
+            <div class="signal" aria-hidden="true"><span class="dot"></span><div class="eq"><span></span><span></span><span></span><span></span></div></div>
+            <div class="text">
+              <div class="title"><span class="badge">Live</span> ${radio.name}</div>
+              <div class="meta">Live audio from ${radio.name}.</div>
+              <div class="status-row"><span class="badge warn live-status" style="display:none">Loading…</span></div>
+            </div>
+          </div>
+          <div class="controls">
+            <button class="btn live-btn" type="button">▶ Play</button>
+            <input type="range" min="0" max="100" value="100" class="vol live-vol" aria-label="Volume" />
+          </div>
+        `;
+        const player = ensureLivePlayer(radio.id);
+        qs('.live-btn', card).addEventListener('click', () => toggleLivePlayback(radio.id));
+        qs('.live-vol', card).addEventListener('input', (event) => {
+          player.audio.volume = Number(event.target.value || 100) / 100;
+        });
+        liveStreamsEl.appendChild(card);
+        updateLiveUiForRadio(radio.id);
+      }
+    }
+
+    function createButton(label, handler, ghost = false) {
+      const button = document.createElement('button');
+      button.className = ghost ? 'btn ghost' : 'btn';
+      button.type = 'button';
+      button.textContent = label;
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        handler();
+      });
+      return button;
+    }
+
+    function shouldIgnoreRowTap(event) {
+      return !!event.target.closest('.actions, .seek, button, input');
+    }
+
+    function bindRowTap(row, handler) {
+      const tapState = {
+        pointerId: null,
+        startX: 0,
+        startY: 0,
+        moved: false,
+        suppressNextClick: false,
+      };
+      const MOVE_TOLERANCE = 10;
+
+      row.addEventListener('pointerdown', (event) => {
+        if (shouldIgnoreRowTap(event)) return;
+        tapState.pointerId = event.pointerId;
+        tapState.startX = event.clientX;
+        tapState.startY = event.clientY;
+        tapState.moved = false;
+      });
+
+      row.addEventListener('pointermove', (event) => {
+        if (tapState.pointerId !== event.pointerId) return;
+        if (tapState.moved) return;
+        const dx = Math.abs(event.clientX - tapState.startX);
+        const dy = Math.abs(event.clientY - tapState.startY);
+        if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) {
+          tapState.moved = true;
+        }
+      });
+
+      row.addEventListener('pointercancel', () => {
+        tapState.pointerId = null;
+        tapState.moved = false;
+      });
+
+      row.addEventListener('pointerup', async (event) => {
+        if (shouldIgnoreRowTap(event)) return;
+        const isSamePointer = tapState.pointerId === event.pointerId;
+        const shouldHandle = isSamePointer && !tapState.moved;
+        tapState.pointerId = null;
+        tapState.moved = false;
+        if (!shouldHandle) return;
+        tapState.suppressNextClick = true;
+        event.preventDefault();
+        await handler(event);
+      });
+
+      row.addEventListener('click', async (event) => {
+        if (shouldIgnoreRowTap(event)) return;
+        if (tapState.suppressNextClick) {
+          tapState.suppressNextClick = false;
+          return;
+        }
+        await handler(event);
+      });
+    }
+
+    function isHiddenFolder(name) {
+      const lowered = String(name || '').toLowerCase();
+      return lowered === 'transcribe' || lowered === '_summaries' || lowered === '.transcribe';
+    }
+
+    function isDayFolderName(name) {
+      return /^([A-Za-z]{3})(\d{1,2})-(\d{4})$/.test(String(name));
+    }
+
+    function fmtDayLabelFromName(name) {
+      const match = String(name).match(/^([A-Za-z]{3})(\d{1,2})-(\d{4})$/);
+      return match ? `${match[1]} ${parseInt(match[2], 10)}, ${match[3]}` : name;
+    }
+
+    function parseFileLabel(name, timestamp) {
+      const match = String(name || '').match(/^(\d{1,2})_(\d{2})(AM|PM)(?: \((\d+)\))?(?: (.+))?\.(wav|mp3)$/i);
+      if (match) {
+        const hour = String(parseInt(match[1], 10));
+        const minute = match[2];
+        const meridiem = match[3].toUpperCase();
+        const duplicateIndex = match[4] ? Number(match[4]) + 1 : null;
+        const radioLabel = (match[5] || '').trim();
+        return {
+          title: `${hour}:${minute} ${meridiem}`,
+          radioLabel,
+          duplicateIndex,
+        };
+      }
+      return {
+        title: new Date(timestamp * 1000).toLocaleString([], { hour: 'numeric', minute: '2-digit' }),
+        radioLabel: '',
+        duplicateIndex: null,
+      };
+    }
+
+    function sortItems(items) {
+      return [...items].sort((a, b) => {
+        const rank = (item) => (item.type === 'dir' ? 0 : 1);
+        const rankDiff = rank(a) - rank(b);
+        if (rankDiff !== 0) return rankDiff;
+        return (b.mtime || 0) - (a.mtime || 0);
+      });
+    }
+
+    function setPill(pill, type) {
+      if (type === 'played') {
+        pill.textContent = 'Played';
+        pill.style.borderColor = '#2e5a45';
+        pill.style.color = '#7cf0c7';
+      } else if (type === 'half') {
+        pill.textContent = 'Half';
+        pill.style.borderColor = '#6b5a2e';
+        pill.style.color = '#ffd27a';
+      } else {
+        pill.textContent = 'New';
+        pill.style.borderColor = '#2a3e5a';
+        pill.style.color = '#9cc6ff';
+      }
+    }
+
+    function setFolderPill(pill, played) {
+      if (!pill) return;
+      if (played) {
+        pill.textContent = 'Played';
+        pill.style.borderColor = '#2e5a45';
+        pill.style.color = '#7cf0c7';
+        pill.classList.remove('hidden');
+      } else {
+        pill.textContent = '';
+        pill.classList.add('hidden');
+      }
+    }
+
+    function findFolderRow(folderPath) {
+      const clean = (folderPath || '').replace(/\/+$/, '');
+      if (clean === '' || clean === '/') return null;
+      const parts = clean.split('/').filter(Boolean);
+      const name = parts.pop();
+      const parent = parts.length ? `/${parts.join('/')}` : '/';
+      return qsa('.row').find((row) => row.dataset && row.dataset.type === 'dir' && row.dataset.cwd === parent && row.dataset.name === name);
+    }
+
+    async function refreshFolderPillForPath(folderPath) {
+      try {
+        const row = findFolderRow(folderPath);
+        if (!row) return;
+        const pill = row.querySelector('.folder-pill');
+        if (!pill) return;
+        const payload = await fetchJson(`/api/recordings?path=${encodeURIComponent(folderPath)}`);
+        const files = payload.items.filter((item) => item.type === 'file');
+        const dirs = payload.items.filter((item) => item.type === 'dir');
+        let totalFiles = files.length;
+        let allPlayed = files.length > 0 && files.every((file) => getLocalStatus(payload.cwd, file.name) === 'played');
+        if (files.length === 0 && dirs.length > 0) {
+          allPlayed = true;
+          for (const dir of dirs) {
+            const sub = await fetchJson(`/api/recordings?path=${encodeURIComponent(`${payload.cwd === '/' ? '' : payload.cwd}/${dir.name}`)}`);
+            const subFiles = sub.items.filter((item) => item.type === 'file');
+            totalFiles += subFiles.length;
+            if (subFiles.length && !subFiles.every((file) => getLocalStatus(sub.cwd, file.name) === 'played')) {
+              allPlayed = false;
+            }
+          }
+        }
+        if (totalFiles === 0) allPlayed = false;
+        setFolderPill(pill, allPlayed);
+      } catch (_) {}
+    }
+
+    function stopActiveRecording(resetTime = true) {
+      if (!activeRecordingAudio) return;
+      activeRecordingAudio.pause();
+      if (resetTime) {
+        try {
+          activeRecordingAudio.currentTime = 0;
+        } catch (_) {}
+      }
+    }
+
+    function stopPlaylist() {
+      state.playlistToken += 1;
+    }
+
+    function getRow(cwd, name) {
+      return qsa('.row').find((row) => row.dataset && row.dataset.cwd === cwd && row.dataset.name === name);
+    }
+
+    function updateRecordingPlaybackUi() {
+      qsa('.grid.row[data-type="file"]', listEl).forEach((row) => {
+        const isActive = row.dataset.key === state.activeRecordingKey;
+        const audio = row._audio;
+        const playBtn = row.querySelector('.playbtn');
+        row.classList.toggle('playing', !!(isActive && audio && !audio.paused));
+        if (playBtn) {
+          playBtn.textContent = isActive && audio && !audio.paused ? 'Pause' : 'Play';
+        }
+      });
+    }
+
+    async function toggleRecordingPlayback(row, options = {}) {
+      const audio = row?._audio;
+      if (!audio) return;
+      const isSame = state.activeRecordingKey === row.dataset.key;
+      if (activeRecordingAudio && activeRecordingAudio !== audio) {
+        const previousKey = state.activeRecordingKey;
+        if (!options.fromPlaylist) stopPlaylist();
+        stopActiveRecording(true);
+        if (previousKey) {
+          const [previousCwd, previousName] = previousKey.split('\n');
+          setLocalStatus(previousCwd, previousName, 'half');
+          const previousRow = getRow(previousCwd, previousName);
+          const previousPill = previousRow?.querySelector('.played .pill');
+          if (previousPill) setPill(previousPill, 'half');
+        }
+      }
+      if (isSame && !audio.paused) {
+        audio.pause();
+        state.activeRecordingKey = null;
+        activeRecordingAudio = null;
+        updateRecordingPlaybackUi();
+        return;
+      }
+      state.activeRecordingKey = row.dataset.key;
+      activeRecordingAudio = audio;
+      try {
+        await audio.play();
+      } catch (error) {
+        state.activeRecordingKey = null;
+        activeRecordingAudio = null;
+        updateRecordingPlaybackUi();
+        setStatus(`Playback failed: ${error.message}`);
+        return;
+      }
+      updateRecordingPlaybackUi();
+    }
+
+    async function playFolderQueue(folderPath, rowNode, disclosure) {
+      const currentToken = ++state.playlistToken;
+      const payload = await fetchJson(`/api/recordings?path=${encodeURIComponent(folderPath)}`);
+      if (!rowNode.nextElementSibling || !rowNode.nextElementSibling.classList.contains('childlist')) {
+        await toggleFolder(folderPath, rowNode, disclosure);
+      }
+      const queue = payload.items
+        .filter((item) => item.type === 'file')
+        .sort((a, b) => (a.mtime || 0) - (b.mtime || 0))
+        .map((item) => getRow(payload.cwd, item.name))
+        .filter(Boolean);
+      for (const queueRow of queue) {
+        if (currentToken !== state.playlistToken) return;
+        await toggleRecordingPlayback(queueRow, { fromPlaylist: true });
+        const audio = queueRow._audio;
+        if (!audio) continue;
+        await new Promise((resolve) => {
+          const finish = () => {
+            audio.removeEventListener('ended', finish);
+            audio.removeEventListener('pause', onPause);
+            resolve();
+          };
+          const onPause = () => {
+            if (audio.ended || audio.currentTime === 0 || currentToken !== state.playlistToken) finish();
+          };
+          audio.addEventListener('ended', finish, { once: true });
+          audio.addEventListener('pause', onPause);
+        });
+      }
+    }
+
+    function makeRow(entry, cwd) {
+      const row = rowT.content.firstElementChild.cloneNode(true);
+      const iconEl = row.querySelector('.icon');
+      const nameEl = row.querySelector('.name');
+      const playedEl = row.querySelector('.played');
+      const actionsEl = row.querySelector('.actions');
+
+      row.dataset.type = entry.type;
+      row.dataset.cwd = cwd;
+      row.dataset.name = entry.name;
+      row.dataset.key = keyFor(cwd, entry.name);
+      playedEl.classList.add('col-played');
+
+      if (entry.type === 'dir') {
+        const disclosure = document.createElement('span');
+        disclosure.className = 'disclosure';
+        disclosure.textContent = '▸';
+        iconEl.appendChild(disclosure);
+
+        const link = document.createElement('span');
+        link.className = 'row-link';
+        const folderPath = `${cwd === '/' ? '' : cwd}/${entry.name}`;
+        link.textContent = cwd === '/' && isDayFolderName(entry.name) ? fmtDayLabelFromName(entry.name) : entry.name;
+        link.title = entry.name;
+        nameEl.appendChild(link);
+
+        const folderPill = document.createElement('span');
+        folderPill.className = 'pill hidden folder-pill';
+        playedEl.appendChild(folderPill);
+
+        const isDayFolder = cwd === '/' && isDayFolderName(entry.name);
+        if (!isDayFolder) {
+          actionsEl.appendChild(createButton('Play All', async () => playFolderQueue(folderPath, row, disclosure)));
+        }
+        bindRowTap(row, async () => {
+          await toggleFolder(folderPath, row, disclosure);
+        });
+        refreshFolderPillForPath(folderPath);
+        return row;
+      }
+
+      const labelInfo = parseFileLabel(entry.name, entry.mtime);
+      const label = document.createElement('span');
+      label.dataset.fullname = entry.name;
+      label.textContent = labelInfo.title;
+      label.title = entry.name.replace(/\.(wav|mp3)$/i, '');
+      nameEl.appendChild(label);
+
+      const metaRow = document.createElement('div');
+      metaRow.className = 'sub';
+      if (labelInfo.radioLabel) {
+        const radioPill = document.createElement('span');
+        radioPill.className = 'meta-pill';
+        radioPill.textContent = labelInfo.radioLabel;
+        metaRow.appendChild(radioPill);
+      }
+      if (labelInfo.duplicateIndex) {
+        const seqPill = document.createElement('span');
+        seqPill.className = 'meta-pill seq';
+        seqPill.textContent = `Clip ${labelInfo.duplicateIndex}`;
+        metaRow.appendChild(seqPill);
+      }
+      if (metaRow.childElementCount) {
+        nameEl.appendChild(metaRow);
+      }
+
+      const inline = document.createElement('div');
+      inline.className = 'inrow-player';
+      inline.innerHTML = '<span class="time cur">0:00</span><input type="range" class="seek" min="0" max="1" value="0" step="0.01" aria-label="Seek" /><span class="time dur">—</span>';
+      row.insertBefore(inline, playedEl);
+
+      const curEl = qs('.cur', inline);
+      const seekEl = qs('.seek', inline);
+      const durEl = qs('.dur', inline);
+      const audio = new Audio(`/api/recordings/file?path=${encodeURIComponent(entry.path)}`);
+      audio.preload = 'metadata';
+      row._audio = audio;
+
+      const syncInline = () => {
+        const duration = audio.duration || 0;
+        const current = audio.currentTime || 0;
+        if (Number.isFinite(duration) && duration > 0) {
+          seekEl.max = String(duration);
+          seekEl.value = String(current);
+          durEl.textContent = formatSeconds(duration);
+        } else {
+          seekEl.max = '1';
+          seekEl.value = '0';
+          durEl.textContent = '—';
+        }
+        curEl.textContent = formatSeconds(current);
+      };
+
+      audio.addEventListener('timeupdate', syncInline);
+      audio.addEventListener('durationchange', syncInline);
+      audio.addEventListener('loadedmetadata', syncInline);
+      audio.addEventListener('play', () => {
+        state.activeRecordingKey = row.dataset.key;
+        activeRecordingAudio = audio;
+        updateRecordingPlaybackUi();
+      });
+      audio.addEventListener('pause', () => {
+        if (activeRecordingAudio === audio) {
+          activeRecordingAudio = null;
+          if (state.activeRecordingKey === row.dataset.key) state.activeRecordingKey = null;
+        }
+        updateRecordingPlaybackUi();
+      });
+
+      const filesum = document.createElement('span');
+      filesum.className = 'filesum';
+      const sizeStr = formatSize(entry.size);
+      const sizeNode = document.createElement('span');
+      sizeNode.className = 'fsize';
+      sizeNode.textContent = sizeStr;
+      const separator = document.createElement('span');
+      separator.className = 'sep-dot';
+      separator.textContent = ' • ';
+      separator.style.display = 'none';
+      const lengthNode = document.createElement('span');
+      lengthNode.className = 'flen';
+      filesum.append(sizeNode, separator, lengthNode);
+      playedEl.appendChild(filesum);
+
+      const pill = document.createElement('span');
+      pill.className = 'pill';
+      setPill(pill, getLocalStatus(cwd, entry.name) || 'new');
+      playedEl.appendChild(pill);
+
+      const setLength = () => {
+        const duration = audio.duration;
+        if (Number.isFinite(duration) && duration > 0) {
+          lengthNode.textContent = formatSeconds(duration);
+          if (sizeStr) separator.style.display = '';
+        }
+      };
+
+      audio.addEventListener('loadedmetadata', setLength);
+      audio.addEventListener('durationchange', setLength);
+      audio.addEventListener('ended', () => {
+        try {
+          audio.currentTime = 0;
+        } catch (_) {}
+        syncInline();
+        setLocalStatus(cwd, entry.name, 'played');
+        setPill(pill, 'played');
+        if (activeRecordingAudio === audio) activeRecordingAudio = null;
+        if (state.activeRecordingKey === row.dataset.key) state.activeRecordingKey = null;
+        updateRecordingPlaybackUi();
+      });
+
+      ['mousedown', 'click', 'touchstart'].forEach((eventName) =>
+        seekEl.addEventListener(eventName, (event) => event.stopPropagation())
+      );
+      seekEl.addEventListener('input', () => {
+        if (Number.isFinite(audio.duration || 0)) audio.currentTime = Number(seekEl.value || 0);
+      });
+
+      const playBtn = createButton('Play', () => { stopPlaylist(); toggleRecordingPlayback(row); });
+      playBtn.classList.add('playbtn');
+      actionsEl.appendChild(playBtn);
+      actionsEl.appendChild(createButton('Mark Played', () => {
+        setLocalStatus(cwd, entry.name, 'played');
+        setPill(pill, 'played');
+      }));
+      actionsEl.appendChild(createButton('Download', () => {
+        const link = document.createElement('a');
+        link.href = `/api/recordings/file?path=${encodeURIComponent(entry.path)}`;
+        link.download = entry.name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }, true));
+
+      bindRowTap(row, async () => {
+        stopPlaylist();
+        await toggleRecordingPlayback(row);
+      });
+
+      return row;
+    }
+
+    async function toggleFolder(path, rowNode, disclosure) {
+      const next = rowNode.nextElementSibling;
+      if (next && next.classList.contains('childlist')) {
+        next.remove();
+        if (disclosure) disclosure.textContent = '▸';
+        return;
+      }
+
+      const payload = await fetchJson(`/api/recordings?path=${encodeURIComponent(path)}`);
+      const wrap = document.createElement('div');
+      wrap.className = 'childlist';
+      const visibleItems = sortItems(payload.items.filter((item) => !(item.type === 'dir' && isHiddenFolder(item.name))));
+
+      if (!visibleItems.length) {
+        wrap.innerHTML = '<div class="empty">No recordings here yet.</div>';
+      } else {
+        for (const item of visibleItems) {
+          wrap.appendChild(makeRow(item, payload.cwd));
+        }
+      }
+
+      rowNode.insertAdjacentElement('afterend', wrap);
+      if (disclosure) disclosure.textContent = '▾';
+      updateRecordingPlaybackUi();
+    }
+
+    async function nav(path = '/') {
+      setStatus('Loading…');
+      const payload = await fetchJson(`/api/recordings?path=${encodeURIComponent(path)}`);
+      renderBreadcrumbs();
+      listEl.innerHTML = '';
+      const visibleItems = sortItems(payload.items.filter((item) => !(item.type === 'dir' && isHiddenFolder(item.name))));
+
+      if (!visibleItems.length) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.innerHTML = '<div class="section-title">No recordings here yet.</div><div class="muted">Once the recorder writes folders and files, they will appear in this section.</div>';
+        listEl.appendChild(empty);
+      } else {
+        for (const item of visibleItems) {
+          listEl.appendChild(makeRow(item, payload.cwd));
+        }
+      }
+
+      setStatus(`${visibleItems.length} item${visibleItems.length === 1 ? '' : 's'}`);
+      updateRecordingPlaybackUi();
+    }
+
+    async function toggleLivePlayback(radioId) {
+      const player = ensureLivePlayer(radioId);
+      if (player.state === 'playing' || player.state === 'connecting') {
+        player.audio.pause();
+        player.audio.removeAttribute('src');
+        player.audio.load();
+        setLiveStateForRadio(radioId, 'idle');
+        return;
+      }
+      player.audio.src = localIcecastStreamUrl(radioId);
+      const card = qs(`.livecard[data-radio-id="${CSS.escape(radioId)}"]`, liveStreamsEl);
+      const volumeValue = Number(qs('.live-vol', card)?.value || 100) / 100;
+      player.audio.volume = volumeValue;
+      setLiveStateForRadio(radioId, 'connecting', 'Connecting…');
+      try {
+        await player.audio.play();
+        setLiveStateForRadio(radioId, 'playing');
+      } catch (error) {
+        setLiveStateForRadio(radioId, 'idle', 'Connect failed');
+        setStatus(`Live stream failed: ${error.message}`);
+      }
+    }
+
+    (async () => {
+      try {
+        renderSiteContent(loadCachedSiteContent());
+        const siteContent = await fetchJson('/api/site-content');
+        renderSiteContent(siteContent);
+        await nav('/');
+      } catch (error) {
+        setStatus(`Startup failed: ${error.message}`);
+      }
+    })();
+  </script>
+</body>
+</html>
