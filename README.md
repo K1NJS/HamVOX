@@ -25,7 +25,7 @@ Threshold Meter
 
 ```bash
 cd /home/user
-git clone <your-repo-url> HamVOX
+git clone https://github.com/K1NJS/HamVOX.git
 cd HamVOX
 ```
 
