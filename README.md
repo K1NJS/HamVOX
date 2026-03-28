@@ -4,10 +4,15 @@ HamVOX is a self-hosted radio recorder for Docker-based Ubuntu installs. Plug a 
 
 ## Screenshots
 
-Homepage
-Settings
-Radio Settings
-Threshold Meter
+![Homepage](images/homepage.png)
+
+| Settings | Radio Settings |
+|---|---|
+| ![Settings](images/settings.png) | ![Radio Settings](images/radiosettings.png) |
+
+| Homepage View 2 | Threshold Meter |
+|---|---|
+| ![Homepage View 2](images/homepage2.png) | ![Threshold Meter](images/Threshold.png) |
 
 ## Features
 
@@ -168,4 +173,3 @@ Files include the radio name and duplicate count when needed, for example:
 7_29PM (1) UV-5R.wav
 7_29PM Anytone.wav
 ```
-
