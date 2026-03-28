@@ -64,9 +64,7 @@ docker compose up -d --build
 ### 5. Open the app
 
 - Homepage: `http://localhost:8080/`
-- Settings: `http://localhost:8080/settings`
-- Files: `http://localhost:8080/files`
-- Icecast status: `http://localhost:8000/status.xsl`
+- Icecast status: `http://localhost:8000/`
 
 ## Environment Variables
 
