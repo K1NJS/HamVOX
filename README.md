@@ -4,10 +4,10 @@ HamVOX is a self-hosted radio recorder for Docker-based Ubuntu installs. Plug a 
 
 ## Screenshots
 
-Homepage
-Settings
-Radio Settings
-Threshold Meter
+![Homepage](images/homepage.png)
+![Settings](images/settings.png)
+![Radio Settings](images/radiosettings.png)
+![Threshold Meter](images/Threshold.png)
 
 ## Features
 
