@@ -11,7 +11,8 @@ RUN apt-get update \
 COPY docker/icecast/icecast.xml.template /opt/radio-recorder-icecast/icecast.xml.template
 COPY docker/icecast/start-icecast.sh /opt/radio-recorder-icecast/start-icecast.sh
 
-RUN chmod +x /opt/radio-recorder-icecast/start-icecast.sh
+RUN sed -i 's/\r$//' /opt/radio-recorder-icecast/start-icecast.sh /opt/radio-recorder-icecast/icecast.xml.template \
+    && chmod +x /opt/radio-recorder-icecast/start-icecast.sh
 
 EXPOSE 8000
 

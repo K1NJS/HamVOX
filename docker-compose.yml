@@ -11,6 +11,7 @@ services:
       HAMVOX_APP_PORT: ${HAMVOX_APP_PORT:-8080}
       HAMVOX_RECORDINGS_ROOT: ${HAMVOX_RECORDINGS_ROOT:-/recordings}
       HAMVOX_ARCHIVE_ROOT: ${HAMVOX_ARCHIVE_ROOT:-/recordings/archive}
+      HAMVOX_TRANSCRIPTS_ROOT: ${HAMVOX_TRANSCRIPTS_ROOT:-/recordings/transcripts}
       HAMVOX_SETTINGS_PATH: ${HAMVOX_SETTINGS_PATH:-/recordings/.radio-recorder-app/application-settings.json}
       ICECAST_SERVICE_HOST: hamvox-icecast
       ICECAST_SERVICE_PORT: "8000"
@@ -19,13 +20,18 @@ services:
       HAMVOX_ADMIN_USERNAME: ${HAMVOX_ADMIN_USERNAME:-admin}
       HAMVOX_ADMIN_PASSWORD: ${HAMVOX_ADMIN_PASSWORD:-}
       HAMVOX_PROTECT_PUBLIC: ${HAMVOX_PROTECT_PUBLIC:-false}
+      HAMVOX_PROTECT_TRANSCRIPTS: ${HAMVOX_PROTECT_TRANSCRIPTS:-false}
+      HAMVOX_PROTECT_LOGS: ${HAMVOX_PROTECT_LOGS:-false}
+      HAMVOX_EVENT_LOG_PATH: ${HAMVOX_EVENT_LOG_PATH:-/recordings/.radio-recorder-app/logs/events.jsonl}
+      HAMVOX_EVENT_LOG_MAX_BYTES: ${HAMVOX_EVENT_LOG_MAX_BYTES:-10485760}
       TZ: ${HAMVOX_TIMEZONE:-America/New_York}
-    devices:
-      - /dev/snd:/dev/snd
+    privileged: true
     ipc: host
     volumes:
       - ./src:/app/src:ro
       - ${HAMVOX_RECORDINGS_ROOT_HOST:-./recordings}:/recordings
+      - /dev/snd:/dev/snd
+      - /run/udev:/run/udev:ro
     restart: unless-stopped
     depends_on:
       - hamvox-icecast
@@ -41,17 +47,20 @@ services:
       HAMVOX_ARCHIVE_ROOT: ${HAMVOX_ARCHIVE_ROOT:-/recordings/archive}
       HAMVOX_SETTINGS_PATH: ${HAMVOX_SETTINGS_PATH:-/recordings/.radio-recorder-app/application-settings.json}
       HAMVOX_TIMEZONE: ${HAMVOX_TIMEZONE:-America/New_York}
+      HAMVOX_EVENT_LOG_PATH: ${HAMVOX_EVENT_LOG_PATH:-/recordings/.radio-recorder-app/logs/events.jsonl}
+      HAMVOX_EVENT_LOG_MAX_BYTES: ${HAMVOX_EVENT_LOG_MAX_BYTES:-10485760}
       TZ: ${HAMVOX_TIMEZONE:-America/New_York}
       ICECAST_SOURCE_PASSWORD: ${ICECAST_SOURCE_PASSWORD:-change-me-source}
       ICECAST_SERVICE_HOST: hamvox-icecast
       ICECAST_SERVICE_PORT: "8000"
       ICECAST_SOURCE_MOUNT: radio.mp3
-    devices:
-      - /dev/snd:/dev/snd
+    privileged: true
     ipc: host
     volumes:
       - ./src:/app/src:ro
       - ${HAMVOX_RECORDINGS_ROOT_HOST:-./recordings}:/recordings
+      - /dev/snd:/dev/snd
+      - /run/udev:/run/udev:ro
     restart: unless-stopped
     depends_on:
       - hamvox-icecast
@@ -67,10 +76,39 @@ services:
       HAMVOX_ARCHIVE_ROOT: ${HAMVOX_ARCHIVE_ROOT:-/recordings/archive}
       HAMVOX_SETTINGS_PATH: ${HAMVOX_SETTINGS_PATH:-/recordings/.radio-recorder-app/application-settings.json}
       HAMVOX_TIMEZONE: ${HAMVOX_TIMEZONE:-America/New_York}
+      HAMVOX_EVENT_LOG_PATH: ${HAMVOX_EVENT_LOG_PATH:-/recordings/.radio-recorder-app/logs/events.jsonl}
+      HAMVOX_EVENT_LOG_MAX_BYTES: ${HAMVOX_EVENT_LOG_MAX_BYTES:-10485760}
       TZ: ${HAMVOX_TIMEZONE:-America/New_York}
-    devices:
-      - /dev/snd:/dev/snd
+    privileged: true
     ipc: host
+    volumes:
+      - ./src:/app/src:ro
+      - ${HAMVOX_RECORDINGS_ROOT_HOST:-./recordings}:/recordings
+      - /dev/snd:/dev/snd
+      - /run/udev:/run/udev:ro
+    restart: unless-stopped
+
+  hamvox-transcribe:
+    build:
+      context: .
+      dockerfile: docker/hamvox-app.Dockerfile
+    container_name: hamvox-transcribe
+    command: ["python", "-m", "backend.services.openai_transcription_service"]
+    environment:
+      HAMVOX_ARCHIVE_ROOT: ${HAMVOX_ARCHIVE_ROOT:-/recordings/archive}
+      HAMVOX_TRANSCRIPTS_ROOT: ${HAMVOX_TRANSCRIPTS_ROOT:-/recordings/transcripts}
+      HAMVOX_SETTINGS_PATH: ${HAMVOX_SETTINGS_PATH:-/recordings/.radio-recorder-app/application-settings.json}
+      HAMVOX_TIMEZONE: ${HAMVOX_TIMEZONE:-America/New_York}
+      HAMVOX_TRANSCRIPTION_SCAN_SECONDS: ${HAMVOX_TRANSCRIPTION_SCAN_SECONDS:-45}
+      HAMVOX_OPENAI_RETRY_MAX: ${HAMVOX_OPENAI_RETRY_MAX:-5}
+      HAMVOX_OPENAI_RETRY_BASE: ${HAMVOX_OPENAI_RETRY_BASE:-2.0}
+      HAMVOX_OPENAI_HOUR_SUMMARY_MAX_INPUT_CHARS: ${HAMVOX_OPENAI_HOUR_SUMMARY_MAX_INPUT_CHARS:-24000}
+      HAMVOX_OPENAI_DAY_SUMMARY_MAX_INPUT_CHARS: ${HAMVOX_OPENAI_DAY_SUMMARY_MAX_INPUT_CHARS:-32000}
+      HAMVOX_OPENAI_HOUR_SUMMARY_MAX_TOKENS: ${HAMVOX_OPENAI_HOUR_SUMMARY_MAX_TOKENS:-500}
+      HAMVOX_OPENAI_DAY_SUMMARY_MAX_TOKENS: ${HAMVOX_OPENAI_DAY_SUMMARY_MAX_TOKENS:-750}
+      HAMVOX_EVENT_LOG_PATH: ${HAMVOX_EVENT_LOG_PATH:-/recordings/.radio-recorder-app/logs/events.jsonl}
+      HAMVOX_EVENT_LOG_MAX_BYTES: ${HAMVOX_EVENT_LOG_MAX_BYTES:-10485760}
+      TZ: ${HAMVOX_TIMEZONE:-America/New_York}
     volumes:
       - ./src:/app/src:ro
       - ${HAMVOX_RECORDINGS_ROOT_HOST:-./recordings}:/recordings

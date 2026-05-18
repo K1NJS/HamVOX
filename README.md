@@ -22,6 +22,8 @@ HamVOX is a self-hosted radio recorder Docker app. Plug a ham radio or scanner a
 - Web UI for live listening, playback, settings, and file management
 - Optional SMB mirroring for new recordings
 - Optional Discord alerts
+- OpenAI transcription with hourly and daily summaries
+- Service event logs for OpenAI, Discord, recorder, and Icecast errors
 - Settings backup and restore
 
 ## Install
@@ -51,6 +53,9 @@ You usually only need to review:
 - `HAMVOX_ADMIN_USERNAME`
 - `HAMVOX_ADMIN_PASSWORD`
 - `HAMVOX_PROTECT_PUBLIC`
+- `HAMVOX_PROTECT_TRANSCRIPTS`
+- `HAMVOX_PROTECT_LOGS`
+- `HAMVOX_UI_THEME`
 - `ICECAST_HOSTNAME`
 - `ICECAST_SOURCE_PASSWORD`
 - `ICECAST_ADMIN_PASSWORD`
@@ -77,19 +82,25 @@ HamVOX uses `.env` for startup, storage, auth, and Icecast defaults. Most day-to
 - `HAMVOX_RECORDINGS_ROOT_HOST`
 - `HAMVOX_RECORDINGS_ROOT`
 - `HAMVOX_ARCHIVE_ROOT`
+- `HAMVOX_TRANSCRIPTS_ROOT`
 - `HAMVOX_SETTINGS_PATH`
 - `HAMVOX_TIMEZONE`
+- `HAMVOX_UI_THEME`
 
 ### Admin access
 
 - `HAMVOX_ADMIN_USERNAME`
 - `HAMVOX_ADMIN_PASSWORD`
 - `HAMVOX_PROTECT_PUBLIC`
+- `HAMVOX_PROTECT_TRANSCRIPTS`
+- `HAMVOX_PROTECT_LOGS`
 
 Behavior:
 
 - if `HAMVOX_ADMIN_PASSWORD` is blank, nothing is protected
 - if a password is set and `HAMVOX_PROTECT_PUBLIC=false`, only `/settings` and `/files` are locked
+- if a password is set and `HAMVOX_PROTECT_TRANSCRIPTS=true`, `/transcripts` and transcript APIs are locked
+- if a password is set and `HAMVOX_PROTECT_LOGS=true`, `/logs` and log APIs are locked
 - if a password is set and `HAMVOX_PROTECT_PUBLIC=true`, the homepage is locked too
 
 ## Using HamVOX
@@ -109,10 +120,12 @@ If multiple radios are enabled, each radio gets its own live stream card.
 The Settings page lets you manage:
 
 - site branding text
+- global light/dark theme
 - SMB backup
 - Discord alerts
 - settings backup and restore
 - radio profiles
+- OpenAI transcription settings
 
 Each radio profile can have its own:
 
@@ -157,6 +170,25 @@ Message templates support:
 ### Settings Backup
 
 HamVOX can export and restore its configuration from the Settings page. This backs up settings only and does not include recordings.
+
+### Transcripts
+
+The Transcripts page shows:
+
+- daily summaries
+- hourly summaries
+- full hour transcript text
+
+Enable OpenAI transcription in Settings and add your API key to populate this page.
+
+### Logs
+
+The Logs page shows service events, especially errors, from:
+
+- OpenAI transcription worker
+- Discord webhook worker
+- recorder worker
+- Icecast/live stream worker
 
 ## Archive Layout
 
