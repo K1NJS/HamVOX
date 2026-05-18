@@ -1,87 +1,788 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HamVOX</title>
+  <script>
+    (function () {
+      const normalizeTheme = (value) => String(value || '').toLowerCase().trim() === 'light' ? 'light' : 'dark';
+      let nextTheme = 'dark';
+      try {
+        const payload = JSON.parse(localStorage.getItem('rr.siteContent.v1') || '{}');
+        if (payload && typeof payload === 'object' && payload.ui_theme) {
+          nextTheme = normalizeTheme(payload.ui_theme);
+        }
+      } catch (_) {}
+      document.documentElement.setAttribute('data-theme', nextTheme);
+    })();
+  </script>
+  <link rel="stylesheet" href="/static/theme.css" />
   <style>
-    :root { --bg:#000; --card:#111; --muted:#8aa0b2; --fg:#e5eef7; --accent:#4da3ff; --line:#1f2a38; --ok:#7cf0c7; --warn:#ffb27a; }
-    html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Helvetica,Arial;overflow-x:hidden;-webkit-tap-highlight-color:transparent}
-    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
-    header{border-bottom:1px solid #1e2228;background:linear-gradient(180deg, rgba(5,7,9,.95), rgba(5,7,9,.75));backdrop-filter:saturate(140%) blur(10px)}
-    .container{max-width:1120px;margin:0 auto;padding:0 1rem 2rem}
-    .topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 0}
-    .brand{display:flex;align-items:baseline;gap:.75rem;flex-wrap:wrap}.callsign{font-weight:800;letter-spacing:.06em;font-size:1.7rem;line-height:1}.tagline{color:var(--muted)}
-    .topnav{display:flex;gap:.5rem;flex-wrap:wrap}.topnav a{background:#0f1620;border:1px solid #2a394a;color:#9cc6ff;border-radius:999px;padding:.35rem .7rem}
-    .card{background:linear-gradient(180deg,#0d1014,#0b0d10);border:1px solid #1f2a38;border-radius:14px;padding:.85rem .95rem;box-shadow:0 1px 0 #000,0 0 0 1px rgba(255,255,255,.03) inset}
-    .infocard{margin:.9rem 0 1rem;padding:1rem 1.05rem}
-    .infocard-title{font-size:1.02rem;font-weight:700;color:#d8e8fb;margin:0 0 .35rem}
-    .infocard-copy{color:var(--muted);margin:0;max-width:72ch}
-    .live-grid{display:grid;gap:.8rem;margin:1rem 0 .8rem}
-    .livecard{display:grid;grid-template-columns:1fr auto;align-items:center;gap:.8rem}.liveleft{display:flex;align-items:center;gap:.9rem;min-width:0}
-    .signal{display:flex;align-items:center;gap:.5rem;padding:.45rem .6rem;background:#0b0f15;border:1px solid #1d2532;border-radius:999px;transition:border-color .22s ease, box-shadow .22s ease, background-color .22s ease}
-    .dot{width:.6rem;height:.6rem;border-radius:50%;background:#d34;transition:background-color .22s ease, box-shadow .22s ease, transform .22s ease}
-    .eq{display:flex;gap:2px;height:16px}
-    .eq span{width:3px;background:#2ee36f;opacity:.28;transform-origin:bottom center;animation:equalizerIdle 1.6s ease-in-out infinite}
-    .eq span:nth-child(1){height:8px;animation-delay:0s}
-    .eq span:nth-child(2){height:14px;animation-delay:.12s}
-    .eq span:nth-child(3){height:10px;animation-delay:.24s}
-    .eq span:nth-child(4){height:16px;animation-delay:.36s}
-    .livecard.connecting .signal{border-color:#4c3b22;box-shadow:0 0 0 1px rgba(255,178,122,.08) inset;background:#15110c}
-    .livecard.connecting .dot{background:#ffb27a;box-shadow:0 0 0 8px rgba(255,178,122,.12);animation:livePulse 1.15s ease-in-out infinite}
-    .livecard.connecting .eq span{opacity:.78;animation:equalizerBusy .75s ease-in-out infinite}
-    .livecard.playing .signal{border-color:#244b38;box-shadow:0 0 0 1px rgba(124,240,199,.08) inset,0 0 18px rgba(46,227,111,.08);background:#0d1712;animation:signalGlow 1.8s ease-in-out infinite}
-    .livecard.playing .dot{background:#2ee36f;box-shadow:0 0 0 8px rgba(46,227,111,.12),0 0 14px rgba(46,227,111,.2);animation:livePulse .95s ease-in-out infinite}
-    .livecard.playing .eq span{opacity:.92;animation:equalizerBusy .72s ease-in-out infinite}
-    @keyframes livePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.16)}}
-    @keyframes equalizerIdle{0%,100%{transform:scaleY(.42)}50%{transform:scaleY(.58)}}
-    @keyframes equalizerBusy{0%,100%{transform:scaleY(.35)}25%{transform:scaleY(1)}50%{transform:scaleY(.5)}75%{transform:scaleY(.88)}}
-    @keyframes signalGlow{0%,100%{box-shadow:0 0 0 1px rgba(124,240,199,.08) inset,0 0 10px rgba(46,227,111,.06)}50%{box-shadow:0 0 0 1px rgba(124,240,199,.16) inset,0 0 22px rgba(46,227,111,.12)}}
-    .title{font-weight:700;letter-spacing:.02em}.meta,.muted{color:var(--muted)}.status-row{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}
-    .badge{display:inline-block;border:1px solid #2a394a;border-radius:999px;padding:.15rem .45rem;font-size:.75rem;color:var(--muted)} .badge.ok{color:var(--ok);border-color:#2e5a45}.badge.warn{color:var(--warn);border-color:#5a422e}
-    .controls{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}.btn{background:#0f0f11;color:var(--fg);border:1px solid #1e2228;border-radius:.6rem;padding:.55rem .7rem;cursor:pointer}.btn:hover{background:#14161a}
-    .vol{appearance:none;width:120px;height:6px;border-radius:999px;background:#0e0e0e;border:1px solid #222}
-    .toolbar{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;margin:.5rem 0 1rem;background:#000;border:1px solid #1e2228;border-radius:12px;padding:.55rem .65rem}
-    .breadcrumbs{display:flex;flex-wrap:wrap;gap:.25rem .35rem}.breadcrumbs .sep{color:#3b4b5c}
-    .grid.row{display:flex;align-items:center;gap:.6rem;background:#111;border:1px solid #1e2228;border-radius:12px;padding:.75rem .9rem;box-shadow:0 1px 0 #000,0 0 0 1px rgba(255,255,255,.02) inset;cursor:pointer;touch-action:pan-y}.grid.row+.grid.row{margin-top:.4rem}.grid.row:hover{background:#141419;border-color:#2a2f37}
-    .grid.row.playing{outline:2px solid #2e5a45;box-shadow:0 0 0 3px rgba(46,90,69,.25) inset}
-    .icon,.mtime,.size{display:none!important}.name{flex:0 0 150px;min-width:150px}.name .sub{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.22rem;color:var(--muted);font-size:.82em;line-height:1.2}.played{margin-left:auto;display:flex;align-items:center;gap:.45rem}.actions{display:flex;gap:.35rem;flex-wrap:wrap}
-    .name a,.row-link{display:inline-block;text-decoration:none;color:var(--fg);cursor:pointer;touch-action:manipulation} .name a:hover,.row-link:hover{text-decoration:none;color:var(--accent)}
-    .disclosure{cursor:pointer;user-select:none;display:inline-block;width:1.2rem;color:#9cc6ff}
-    .childlist{margin:.25rem 0 .5rem 1.6rem;border-left:1px dashed #222;padding-left:.8rem}
-    .hidden{display:none!important}
-    .pill{display:inline-block;border:1px solid #2a394a;border-radius:999px;padding:.15rem .45rem;font-size:.75rem;color:#9cc6ff;background:#0f1620}
-    .meta-pill{display:inline-block;border:1px solid #243142;border-radius:999px;padding:.12rem .42rem;font-size:.72rem;color:#b9d6f2;background:#0f1620}
-    .meta-pill.seq{color:#ffd27a;border-color:#5f4d27;background:#171209}
-    .col-played{display:flex;align-items:center;gap:.45rem}
-    .col-played .filesum{color:var(--muted);font-size:.9em}
-    .col-played .filesum .sep-dot{opacity:.7}
-    .playbtn{min-width:74px}
-    .inrow-player{display:flex;align-items:center;gap:.55rem;flex:0 0 auto;max-width:420px;margin:0 0 0 .35rem}
-    .inrow-player .time{color:var(--muted);font-variant-numeric:tabular-nums;font-size:.83rem;min-width:38px}
-    .inrow-player .seek{appearance:none;flex:0 1 280px;width:280px;max-width:280px;height:4px;border-radius:999px;background:#0e0f11;border:1px solid #222}
-    .inrow-player .seek::-webkit-slider-thumb{appearance:none;width:13px;height:13px;border-radius:50%;background:#4da3ff}
-    .inrow-player .seek::-moz-range-thumb{width:13px;height:13px;border:none;border-radius:50%;background:#4da3ff}
-    .empty{background:#101010;border:1px solid #222;border-radius:12px;padding:.8rem}.section-title{font-size:1rem;color:#cfe4ff;font-weight:650;margin:0 0 .35rem}
-    @media (max-width:900px){.livecard{grid-template-columns:1fr}}
-    @media (max-width:640px){
-      .container{padding:0 .7rem 1.2rem}
-      .callsign{font-size:1.4rem}
-      .topbar{align-items:flex-start}
-      .topnav{gap:.35rem;width:100%}
-      .topnav a{padding:.22rem .52rem;font-size:.84rem}
-      .hero{padding:.85rem}
-      .facts{grid-template-columns:1fr}
-      .livecard{padding:.7rem}
-      .controls{justify-content:flex-start}
-      .childlist{margin:.2rem 0 .45rem .7rem;padding-left:.55rem}
-      .grid.row{flex-wrap:wrap;align-items:flex-start;padding:.7rem}
-      .name{flex:1 1 calc(100% - 64px);min-width:0}
-      .played{order:3;width:100%;margin-left:0;justify-content:flex-start;flex-wrap:wrap}
-      .inrow-player{order:2;flex:1 1 100%;max-width:none;width:100%;margin:.35rem 0 0}
-      .inrow-player .seek{flex:1 1 auto;width:auto;max-width:none}
-      .actions{order:4;width:100%;justify-content:flex-start}
-      .btn,.playbtn{min-width:auto}
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      color: var(--fg);
+      font: 14px/1.45 "Segoe UI", "Ubuntu", "Helvetica", sans-serif;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      border-bottom: 1px solid color-mix(in srgb, var(--line) 68%, transparent 32%);
+      background: color-mix(in srgb, var(--bg) 90%, transparent 10%);
+      backdrop-filter: blur(14px);
+    }
+
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 1rem 2rem;
+    }
+
+    header .container {
+      max-width: 1440px;
+      padding-bottom: 0;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 15px 0;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .callsign {
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .tagline {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .topnav {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .topnav a {
+      padding: 9px 13px;
+      border-radius: 10px;
+      border: 1px solid color-mix(in srgb, var(--line) 68%, transparent 32%);
+      background: color-mix(in srgb, var(--card-2) 88%, transparent 12%);
+      color: color-mix(in srgb, var(--fg) 86%, var(--muted) 14%);
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+    }
+
+    .topnav a:hover {
+      border-color: color-mix(in srgb, var(--accent) 45%, var(--line) 55%);
+      color: var(--fg);
+      text-decoration: none;
+    }
+
+    .topnav a.active {
+      color: color-mix(in srgb, var(--accent) 76%, var(--fg) 24%);
+      border-color: color-mix(in srgb, var(--accent) 58%, var(--line) 42%);
+      background: color-mix(in srgb, var(--accent) 15%, var(--card-2) 85%);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent 86%);
+    }
+
+    .card {
+      background: linear-gradient(180deg, color-mix(in srgb, var(--card) 96%, transparent 4%), color-mix(in srgb, var(--card-2) 96%, transparent 4%));
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 0.85rem 0.95rem;
+      box-shadow: var(--shadow);
+    }
+
+    .infocard {
+      margin: 0.9rem 0 1rem;
+      padding: 1rem 1.05rem;
+    }
+
+    .infocard-title {
+      font-size: 1.02rem;
+      font-weight: 700;
+      color: color-mix(in srgb, var(--fg) 92%, white 8%);
+      margin: 0 0 0.35rem;
+    }
+
+    .infocard-copy {
+      color: var(--muted);
+      margin: 0;
+      max-width: 72ch;
+    }
+
+    .transcript-card {
+      margin: 0 0 1rem;
+      padding: 0.95rem 1rem;
+      display: grid;
+      gap: 0.6rem;
+    }
+
+    .transcript-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .transcript-mode-tabs {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+
+    .transcript-mode-btn {
+      border-radius: 999px;
+      padding: 0.38rem 0.62rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      background: color-mix(in srgb, var(--card-2) 90%, black 10%);
+    }
+
+    .transcript-mode-btn.active {
+      color: color-mix(in srgb, var(--accent) 76%, var(--fg) 24%);
+      border-color: color-mix(in srgb, var(--accent) 58%, var(--line) 42%);
+      background: color-mix(in srgb, var(--accent) 15%, var(--card-2) 85%);
+    }
+
+    .transcript-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .transcript-mode-label {
+      color: color-mix(in srgb, var(--fg) 88%, var(--accent) 12%);
+      font-weight: 600;
+    }
+
+    .transcript-body {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.75rem 0.8rem;
+      background: color-mix(in srgb, var(--card-2) 90%, black 10%);
+      max-height: 210px;
+      overflow: hidden;
+      transition: max-height 0.2s ease;
+    }
+
+    .transcript-body.expanded {
+      max-height: 65vh;
+      overflow: auto;
+    }
+
+    .transcript-body pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font: 13px/1.45 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      color: color-mix(in srgb, var(--fg) 90%, var(--accent) 10%);
+    }
+
+    .transcript-fade {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 54px;
+      background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--card-2) 92%, black 8%) 100%);
+      pointer-events: none;
+    }
+
+    .transcript-body.expanded .transcript-fade {
+      display: none;
+    }
+
+    .transcript-expand-btn {
+      justify-self: end;
+      border-radius: 999px;
+      padding: 0.36rem 0.65rem;
+      font-size: 0.8rem;
+    }
+
+    .live-grid {
+      display: grid;
+      gap: 0.8rem;
+      margin: 1rem 0 0.8rem;
+    }
+
+    .livecard {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .liveleft {
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+      min-width: 0;
+    }
+
+    .signal {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.6rem;
+      background: color-mix(in srgb, var(--card-2) 90%, black 10%);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      transition: border-color 0.22s ease, box-shadow 0.22s ease, background-color 0.22s ease;
+    }
+
+    .dot {
+      width: 0.6rem;
+      height: 0.6rem;
+      border-radius: 50%;
+      background: #d34;
+      transition: background-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+    }
+
+    .eq {
+      display: flex;
+      gap: 2px;
+      height: 16px;
+    }
+
+    .eq span {
+      width: 3px;
+      background: #2ee36f;
+      opacity: 0.28;
+      transform-origin: bottom center;
+      animation: equalizerIdle 1.6s ease-in-out infinite;
+    }
+
+    .eq span:nth-child(1) { height: 8px; animation-delay: 0s; }
+    .eq span:nth-child(2) { height: 14px; animation-delay: 0.12s; }
+    .eq span:nth-child(3) { height: 10px; animation-delay: 0.24s; }
+    .eq span:nth-child(4) { height: 16px; animation-delay: 0.36s; }
+
+    .livecard.connecting .signal {
+      border-color: #7c5b29;
+      box-shadow: 0 0 0 1px rgba(255, 178, 122, 0.08) inset;
+      background: #2a2114;
+    }
+
+    .livecard.connecting .dot {
+      background: #ffb27a;
+      box-shadow: 0 0 0 8px rgba(255, 178, 122, 0.12);
+      animation: livePulse 1.15s ease-in-out infinite;
+    }
+
+    .livecard.connecting .eq span {
+      opacity: 0.78;
+      animation: equalizerBusy 0.75s ease-in-out infinite;
+    }
+
+    .livecard.playing .signal {
+      border-color: #2f6a4c;
+      box-shadow: 0 0 0 1px rgba(124, 240, 199, 0.08) inset, 0 0 18px rgba(46, 227, 111, 0.08);
+      background: #102318;
+      animation: signalGlow 1.8s ease-in-out infinite;
+    }
+
+    .livecard.playing .dot {
+      background: #2ee36f;
+      box-shadow: 0 0 0 8px rgba(46, 227, 111, 0.12), 0 0 14px rgba(46, 227, 111, 0.2);
+      animation: livePulse 0.95s ease-in-out infinite;
+    }
+
+    .livecard.playing .eq span {
+      opacity: 0.92;
+      animation: equalizerBusy 0.72s ease-in-out infinite;
+    }
+
+    @keyframes livePulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.16); }
+    }
+
+    @keyframes equalizerIdle {
+      0%, 100% { transform: scaleY(0.42); }
+      50% { transform: scaleY(0.58); }
+    }
+
+    @keyframes equalizerBusy {
+      0%, 100% { transform: scaleY(0.35); }
+      25% { transform: scaleY(1); }
+      50% { transform: scaleY(0.5); }
+      75% { transform: scaleY(0.88); }
+    }
+
+    @keyframes signalGlow {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(124, 240, 199, 0.08) inset, 0 0 10px rgba(46, 227, 111, 0.06); }
+      50% { box-shadow: 0 0 0 1px rgba(124, 240, 199, 0.16) inset, 0 0 22px rgba(46, 227, 111, 0.12); }
+    }
+
+    .title {
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .meta,
+    .muted {
+      color: var(--muted);
+    }
+
+    .status-row {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .badge {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.15rem 0.45rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      background: color-mix(in srgb, var(--card-2) 90%, black 10%);
+    }
+
+    .badge.ok {
+      color: var(--ok);
+      border-color: color-mix(in srgb, var(--ok) 35%, var(--line) 65%);
+    }
+
+    .badge.warn {
+      color: var(--warn);
+      border-color: color-mix(in srgb, var(--warn) 35%, var(--line) 65%);
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      background: color-mix(in srgb, var(--card-2) 92%, black 8%);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      border-radius: 0.6rem;
+      padding: 0.55rem 0.7rem;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      border-color: var(--accent);
+    }
+
+    .vol {
+      appearance: none;
+      width: 120px;
+      height: 6px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--card-2) 90%, black 10%);
+      border: 1px solid var(--line);
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      align-items: center;
+      margin: 0.5rem 0 1rem;
+      background: color-mix(in srgb, var(--card-2) 90%, black 10%);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.55rem 0.65rem;
+    }
+
+    .storage-summary {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+
+    .recording-source-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+
+    .recording-source-btn {
+      border-radius: 999px;
+      padding: 0.33rem 0.58rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      background: color-mix(in srgb, var(--card-2) 90%, black 10%);
+    }
+
+    .recording-source-btn.active {
+      color: color-mix(in srgb, var(--accent) 76%, var(--fg) 24%);
+      border-color: color-mix(in srgb, var(--accent) 58%, var(--line) 42%);
+      background: color-mix(in srgb, var(--accent) 15%, var(--card-2) 85%);
+    }
+
+    .storage-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.24rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: color-mix(in srgb, var(--card) 90%, black 10%);
+      color: var(--muted);
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+
+    .storage-chip strong {
+      color: var(--fg);
+      font-weight: 700;
+    }
+
+    .storage-chip.ok {
+      border-color: color-mix(in srgb, var(--ok) 45%, var(--line) 55%);
+    }
+
+    .storage-chip.warn {
+      border-color: color-mix(in srgb, var(--warn) 45%, var(--line) 55%);
+    }
+
+    .breadcrumbs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 0.35rem;
+    }
+
+    .breadcrumbs .sep {
+      color: var(--muted);
+      opacity: 0.8;
+    }
+
+    .grid.row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: color-mix(in srgb, var(--card) 92%, black 8%);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.75rem 0.9rem;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+      cursor: pointer;
+      touch-action: pan-y;
+    }
+
+    .grid.row + .grid.row {
+      margin-top: 0.4rem;
+    }
+
+    .grid.row:hover {
+      border-color: var(--accent);
+    }
+
+    .grid.row.playing {
+      outline: 2px solid color-mix(in srgb, var(--ok) 55%, transparent 45%);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent 75%) inset;
+    }
+
+    .icon,
+    .mtime,
+    .size {
+      display: none !important;
+    }
+
+    .name {
+      flex: 0 0 150px;
+      min-width: 150px;
+    }
+
+    .name .sub {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+      margin-top: 0.22rem;
+      color: var(--muted);
+      font-size: 0.82em;
+      line-height: 1.2;
+    }
+
+    .played {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .actions {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+
+    .name a,
+    .row-link {
+      display: inline-block;
+      text-decoration: none;
+      color: var(--fg);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .name a:hover,
+    .row-link:hover {
+      text-decoration: none;
+      color: var(--accent);
+    }
+
+    .disclosure {
+      cursor: pointer;
+      user-select: none;
+      display: inline-block;
+      width: 1.2rem;
+      color: var(--accent);
+    }
+
+    .childlist {
+      margin: 0.25rem 0 0.5rem 1.6rem;
+      border-left: 1px dashed var(--line);
+      padding-left: 0.8rem;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .pill {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.15rem 0.45rem;
+      font-size: 0.75rem;
+      color: color-mix(in srgb, var(--fg) 82%, var(--accent) 18%);
+      background: color-mix(in srgb, var(--card-2) 90%, black 10%);
+    }
+
+    .meta-pill {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.12rem 0.42rem;
+      font-size: 0.72rem;
+      color: color-mix(in srgb, var(--fg) 85%, var(--accent) 15%);
+      background: color-mix(in srgb, var(--card-2) 90%, black 10%);
+    }
+
+    .meta-pill.seq {
+      color: var(--warn);
+      border-color: color-mix(in srgb, var(--warn) 40%, var(--line) 60%);
+      background: color-mix(in srgb, var(--card-2) 80%, #2c1b0a 20%);
+    }
+
+    .col-played {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .col-played .filesum {
+      color: var(--muted);
+      font-size: 0.9em;
+    }
+
+    .col-played .filesum .sep-dot {
+      opacity: 0.7;
+    }
+
+    .playbtn {
+      min-width: 74px;
+    }
+
+    .inrow-player {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      flex: 0 0 auto;
+      max-width: 420px;
+      margin: 0 0 0 0.35rem;
+    }
+
+    .inrow-player .time {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      font-size: 0.83rem;
+      min-width: 38px;
+    }
+
+    .inrow-player .seek {
+      appearance: none;
+      flex: 0 1 280px;
+      width: 280px;
+      max-width: 280px;
+      height: 4px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--card-2) 90%, black 10%);
+      border: 1px solid var(--line);
+    }
+
+    .inrow-player .seek::-webkit-slider-thumb {
+      appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .inrow-player .seek::-moz-range-thumb {
+      width: 13px;
+      height: 13px;
+      border: none;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .empty {
+      background: color-mix(in srgb, var(--card-2) 90%, black 10%);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.8rem;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      color: color-mix(in srgb, var(--fg) 90%, var(--accent) 10%);
+      font-weight: 650;
+      margin: 0 0 0.35rem;
+    }
+
+    @media (max-width: 900px) {
+      .livecard {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .container {
+        padding: 0 0.7rem 1.2rem;
+      }
+
+      .callsign {
+        font-size: 1.35rem;
+      }
+
+      .topbar {
+        align-items: flex-start;
+      }
+
+      .topnav {
+        gap: 0.35rem;
+        width: 100%;
+      }
+
+      .topnav a {
+        padding: 8px 11px;
+        font-size: 0.84rem;
+      }
+
+      .livecard {
+        padding: 0.7rem;
+      }
+
+      .controls {
+        justify-content: flex-start;
+      }
+
+      .childlist {
+        margin: 0.2rem 0 0.45rem 0.7rem;
+        padding-left: 0.55rem;
+      }
+
+      .grid.row {
+        flex-wrap: wrap;
+        align-items: flex-start;
+        padding: 0.7rem;
+      }
+
+      .name {
+        flex: 1 1 calc(100% - 64px);
+        min-width: 0;
+      }
+
+      .played {
+        order: 3;
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .inrow-player {
+        order: 2;
+        flex: 1 1 100%;
+        max-width: none;
+        width: 100%;
+        margin: 0.35rem 0 0;
+      }
+
+      .inrow-player .seek {
+        flex: 1 1 auto;
+        width: auto;
+        max-width: none;
+      }
+
+      .actions {
+        order: 4;
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .btn,
+      .playbtn {
+        min-width: auto;
+      }
     }
   </style>
 </head>
@@ -91,11 +792,14 @@
       <div class="topbar">
         <div class="brand">
           <div class="callsign" id="siteCallsign">HamVOX</div>
-          <div class="tagline" id="siteTagline">Live & Archived Radio Recordings</div>
+          <div class="tagline" id="siteTagline">Live and Archived Radio Recordings</div>
         </div>
         <nav class="topnav">
-          <a href="/settings">Settings</a>
+          <a href="/" class="active">Home</a>
+          <a href="/transcripts">Transcripts</a>
           <a href="/files">Files</a>
+          <a href="/logs">Logs</a>
+          <a href="/settings">Settings</a>
         </nav>
       </div>
     </div>
@@ -107,12 +811,40 @@
       <p class="infocard-copy" id="siteInfoText">HamVOX is a self-hosted radio monitoring app that lets you stream live audio, save timestamped recordings, organize multiple radio profiles, mirror archives to SMB storage, and send Discord alerts when new activity is captured.</p>
     </div>
 
+    <section class="card transcript-card" id="transcriptCard">
+      <div class="transcript-card-head">
+        <div class="infocard-title">Transcription Briefing</div>
+        <div class="transcript-mode-tabs" id="transcriptModeTabs">
+          <button class="btn transcript-mode-btn active" type="button" data-mode="daily">Daily Summary</button>
+          <button class="btn transcript-mode-btn" type="button" data-mode="hourly">Hourly Summary</button>
+          <button class="btn transcript-mode-btn" type="button" data-mode="live">Live Transcription</button>
+        </div>
+      </div>
+      <div class="transcript-meta">
+        <span class="transcript-mode-label" id="transcriptModeLabel">Daily Summary</span>
+        <span id="transcriptUpdated">Loading...</span>
+      </div>
+      <div class="transcript-body" id="transcriptBody">
+        <pre id="transcriptContent">Loading transcripts...</pre>
+        <div class="transcript-fade"></div>
+      </div>
+      <button class="btn transcript-expand-btn" id="transcriptExpandBtn" type="button">Expand</button>
+    </section>
+
     <section class="live-grid" id="liveStreams"></section>
 
     <section id="recordingsSection">
       <div class="toolbar">
         <div class="breadcrumbs" id="breadcrumbs"></div>
         <span class="muted" id="status"></span>
+        <div class="recording-source-toggle hidden" id="recordingSourceToggle">
+          <button class="btn recording-source-btn active" type="button" data-source="local">Local Recordings</button>
+          <button class="btn recording-source-btn" type="button" data-source="smb">SMB Recordings</button>
+        </div>
+        <div class="storage-summary" id="storageSummary">
+          <span class="storage-chip" id="storageLocal">Local <strong>--</strong></span>
+          <span class="storage-chip" id="storageSmb">SMB <strong>--</strong></span>
+        </div>
       </div>
       <div id="list"></div>
     </section>
@@ -124,15 +856,34 @@
     </div>
   </template>
 
+  <script defer src="/static/theme.js"></script>
   <script>
     const SITE_CACHE_KEY = 'rr.siteContent.v1';
     const DEFAULT_SITE_CALLSIGN = 'HamVOX';
-    const DEFAULT_SITE_TAGLINE = 'Live & Archived Radio Recordings';
+    const DEFAULT_SITE_TAGLINE = 'Live and Archived Radio Recordings';
     const DEFAULT_SITE_INFO_TITLE = 'About HamVOX';
     const DEFAULT_SITE_INFO_TEXT = 'HamVOX is a self-hosted radio monitoring app that lets you stream live audio, save timestamped recordings, organize multiple radio profiles, mirror archives to SMB storage, and send Discord alerts when new activity is captured.';
     const qs = (s, e = document) => e.querySelector(s);
     const qsa = (s, e = document) => [...e.querySelectorAll(s)];
-    const state = { activeRecordingKey: null, playlistToken: 0, livePlayers: new Map(), siteContent: null };
+    const state = {
+      activeRecordingKey: null,
+      playlistToken: 0,
+      livePlayers: new Map(),
+      siteContent: null,
+      recordingSource: 'local',
+      smbSourceAvailable: false,
+      currentFolderPath: '/',
+      transcriptCard: {
+        mode: 'daily',
+        expanded: false,
+        dayItem: null,
+        dayPayload: null,
+        hourItem: null,
+        hourPayload: null,
+        error: '',
+        refreshedAt: null,
+      },
+    };
     const listEl = qs('#list');
     const rowT = qs('#rowT');
     const statusEl = qs('#status');
@@ -142,6 +893,17 @@
     const siteTagline = qs('#siteTagline');
     const siteInfoTitle = qs('#siteInfoTitle');
     const siteInfoText = qs('#siteInfoText');
+    const recordingSourceToggleEl = qs('#recordingSourceToggle');
+    const transcriptCardEl = qs('#transcriptCard');
+    const transcriptModeTabsEl = qs('#transcriptModeTabs');
+    const transcriptModeLabelEl = qs('#transcriptModeLabel');
+    const transcriptUpdatedEl = qs('#transcriptUpdated');
+    const transcriptBodyEl = qs('#transcriptBody');
+    const transcriptContentEl = qs('#transcriptContent');
+    const transcriptExpandBtnEl = qs('#transcriptExpandBtn');
+    const storageSummaryEl = qs('#storageSummary');
+    const storageLocalEl = qs('#storageLocal');
+    const storageSmbEl = qs('#storageSmb');
     let activeRecordingAudio = null;
 
     const LS_PLAY_KEY = 'rr.playstate.v2';
@@ -190,28 +952,340 @@
       return String(payload[key]);
     }
 
-    function keyFor(cwd, name) {
-      return `${cwd}\n${name}`;
+    function keyFor(cwd, name, source = state.recordingSource) {
+      return `${source}\n${cwd}\n${name}`;
     }
 
-    function getLocalStatus(cwd, name) {
-      const value = playMap[keyFor(cwd, name)];
+    function buildRecordingsListUrl(path) {
+      return `/api/recordings?path=${encodeURIComponent(path)}&source=${encodeURIComponent(state.recordingSource)}`;
+    }
+
+    function buildRecordingFileUrl(path) {
+      return `/api/recordings/file?path=${encodeURIComponent(path)}&source=${encodeURIComponent(state.recordingSource)}`;
+    }
+
+    function getLocalStatus(cwd, name, source = state.recordingSource) {
+      const value = playMap[keyFor(cwd, name, source)];
       return value === 1 ? 'played' : value === 2 ? 'half' : null;
     }
 
-    function setLocalStatus(cwd, name, type) {
-      const key = keyFor(cwd, name);
+    function setLocalStatus(cwd, name, type, source = state.recordingSource) {
+      const key = keyFor(cwd, name, source);
       if (type === 'played') playMap[key] = 1;
       else if (type === 'half') playMap[key] = 2;
       else delete playMap[key];
       savePlayMap();
-      refreshFolderPillForPath(cwd);
-      const parent = parentPath(cwd);
-      if (parent) refreshFolderPillForPath(parent);
+      if (source === state.recordingSource) {
+        refreshFolderPillForPath(cwd);
+        const parent = parentPath(cwd);
+        if (parent) refreshFolderPillForPath(parent);
+      }
     }
 
     function setStatus(message) {
       statusEl.textContent = message || '';
+    }
+
+    function syncRecordingSourceToggle() {
+      if (!recordingSourceToggleEl) return;
+      recordingSourceToggleEl.classList.toggle('hidden', !state.smbSourceAvailable);
+      qsa('.recording-source-btn', recordingSourceToggleEl).forEach((button) => {
+        button.classList.toggle('active', button.dataset.source === state.recordingSource);
+      });
+    }
+
+    function parsePlaybackKey(key) {
+      const parts = String(key || '').split('\n');
+      if (parts.length >= 3) {
+        return {
+          source: parts[0] || 'local',
+          cwd: parts[1] || '/',
+          name: parts.slice(2).join('\n'),
+        };
+      }
+      if (parts.length === 2) {
+        return { source: 'local', cwd: parts[0] || '/', name: parts[1] || '' };
+      }
+      return { source: 'local', cwd: '/', name: parts[0] || '' };
+    }
+
+    async function setRecordingSource(nextSource) {
+      const source = String(nextSource || '').toLowerCase().trim();
+      if (!['local', 'smb'].includes(source)) return;
+      if (source === 'smb' && !state.smbSourceAvailable) return;
+      if (state.recordingSource === source) return;
+      stopPlaylist();
+      stopActiveRecording(true);
+      activeRecordingAudio = null;
+      state.activeRecordingKey = null;
+      state.recordingSource = source;
+      syncRecordingSourceToggle();
+      const targetPath = state.currentFolderPath || '/';
+      try {
+        await nav(targetPath);
+      } catch (error) {
+        if (targetPath !== '/') {
+          await nav('/');
+          return;
+        }
+        throw error;
+      }
+    }
+
+    function formatTimestamp(value) {
+      if (!value) return 'No updates yet';
+      return new Date(value * 1000).toLocaleString();
+    }
+
+    function pickLiveHourItem(hours) {
+      const list = Array.isArray(hours) ? hours : [];
+      return list.find((item) => item.has_hour_transcript) || list.find((item) => item.has_hour_summary) || list[0] || null;
+    }
+
+    function pickFirstSummaryHourItem(hours, excludedHour = '') {
+      const list = Array.isArray(hours) ? hours : [];
+      const exclude = String(excludedHour || '').toUpperCase();
+      return list.find((item) => item.has_hour_summary && String(item.hour || '').toUpperCase() !== exclude) || null;
+    }
+
+    function pickPreviousDailyDayItem(days) {
+      const list = Array.isArray(days) ? days : [];
+      if (!list.length) return null;
+      const priorWithSummary = list.slice(1).find((item) => item.has_daily_summary);
+      if (priorWithSummary) return priorWithSummary;
+      return list.find((item) => item.has_daily_summary) || list[0] || null;
+    }
+
+    function resolveTranscriptViewModel() {
+      const cardState = state.transcriptCard;
+      if (cardState.error) {
+        const needsAuth = cardState.error.includes('returned 401');
+        return {
+          modeLabel: 'Transcription Unavailable',
+          updatedLabel: needsAuth ? 'Sign in required' : 'Preview unavailable',
+          content: needsAuth
+            ? 'Transcripts are protected. Open the Transcripts page after signing in to view this feed.'
+            : 'Could not load transcript data right now.',
+        };
+      }
+      if (!cardState.dayItem || !cardState.dayPayload) {
+        return {
+          modeLabel: 'Transcription Briefing',
+          updatedLabel: 'No transcript days yet',
+          content: 'No transcript data is available yet. Enable transcription in Settings and wait for new audio to process.',
+        };
+      }
+      if (cardState.mode === 'hourly') {
+        const hourLabel = cardState.hourPayload?.hour || cardState.hourItem?.hour || '--';
+        const dayLabel = cardState.hourPayload?.day || cardState.dayPayload.day || cardState.dayItem.day;
+        const content = (cardState.hourPayload?.hour_summary || '').trim() || 'Hourly summary is not available for the previous hour yet.';
+        return {
+          modeLabel: `Hourly Summary • ${dayLabel} ${hourLabel}`,
+          updatedLabel: `Updated ${formatTimestamp(cardState.hourItem?.updated || cardState.dayItem.updated)}`,
+          content,
+        };
+      }
+      if (cardState.mode === 'live') {
+        const hourLabel = cardState.hourPayload?.hour || cardState.hourItem?.hour || '--';
+        const dayLabel = cardState.hourPayload?.day || cardState.dayPayload.day || cardState.dayItem.day;
+        const content = (cardState.hourPayload?.hour_transcript || '').trim() || 'Live hour transcript is not available yet.';
+        return {
+          modeLabel: `Live Transcription • ${dayLabel} ${hourLabel}`,
+          updatedLabel: `Live refresh ${cardState.refreshedAt ? new Date(cardState.refreshedAt).toLocaleTimeString() : '--'}`,
+          content,
+        };
+      }
+      const dayLabel = cardState.dayPayload.day || cardState.dayItem.day;
+      const content = (cardState.dayPayload.daily_summary || '').trim() || 'Daily summary is not available for the previous day yet.';
+      return {
+        modeLabel: `Daily Summary • ${dayLabel}`,
+        updatedLabel: `Updated ${formatTimestamp(cardState.dayItem.updated)}`,
+        content,
+      };
+    }
+
+    function syncTranscriptExpandUi() {
+      if (!transcriptBodyEl || !transcriptExpandBtnEl) return;
+      transcriptBodyEl.classList.toggle('expanded', state.transcriptCard.expanded);
+      transcriptExpandBtnEl.textContent = state.transcriptCard.expanded ? 'Collapse' : 'Expand';
+    }
+
+    function renderTranscriptModeTabs() {
+      if (!transcriptModeTabsEl) return;
+      qsa('.transcript-mode-btn', transcriptModeTabsEl).forEach((button) => {
+        button.classList.toggle('active', button.dataset.mode === state.transcriptCard.mode);
+      });
+    }
+
+    function renderTranscriptCard() {
+      if (!transcriptCardEl || !transcriptModeLabelEl || !transcriptUpdatedEl || !transcriptContentEl) return;
+      const view = resolveTranscriptViewModel();
+      transcriptModeLabelEl.textContent = view.modeLabel;
+      transcriptUpdatedEl.textContent = view.updatedLabel;
+      transcriptContentEl.textContent = view.content;
+      renderTranscriptModeTabs();
+      syncTranscriptExpandUi();
+    }
+
+    async function loadTranscriptCard() {
+      if (!transcriptCardEl) return;
+      try {
+        const daysPayload = await fetchJson('/api/transcripts/days', { cache: 'no-store' });
+        const days = Array.isArray(daysPayload.days) ? daysPayload.days : [];
+        const latestDayItem = days[0] || null;
+        if (!latestDayItem) {
+          state.transcriptCard.dayItem = null;
+          state.transcriptCard.dayPayload = null;
+          state.transcriptCard.hourItem = null;
+          state.transcriptCard.hourPayload = null;
+          state.transcriptCard.error = '';
+          state.transcriptCard.refreshedAt = Date.now();
+          renderTranscriptCard();
+          return;
+        }
+        const dayPayloadCache = new Map();
+        const loadDayPayload = async (dayItem) => {
+          if (!dayItem || !dayItem.day) return null;
+          if (dayPayloadCache.has(dayItem.day)) return dayPayloadCache.get(dayItem.day);
+          const payload = await fetchJson(`/api/transcripts/day?day=${encodeURIComponent(dayItem.day)}`, { cache: 'no-store' });
+          dayPayloadCache.set(dayItem.day, payload);
+          return payload;
+        };
+
+        const latestDayPayload = await loadDayPayload(latestDayItem);
+        const liveHourItem = pickLiveHourItem(latestDayPayload?.hours || []);
+
+        const dailyDayItem = pickPreviousDailyDayItem(days);
+        const dailyDayPayload = await loadDayPayload(dailyDayItem || latestDayItem);
+
+        let hourlyDayItem = latestDayItem;
+        let hourlyDayPayload = latestDayPayload;
+        let hourlyHourItem = pickFirstSummaryHourItem(hourlyDayPayload?.hours || [], liveHourItem?.hour || '');
+        if (!hourlyHourItem) {
+          for (let i = 1; i < days.length; i += 1) {
+            const candidateDayItem = days[i];
+            const candidateDayPayload = await loadDayPayload(candidateDayItem);
+            const candidateHourItem = pickFirstSummaryHourItem(candidateDayPayload?.hours || []);
+            if (candidateHourItem) {
+              hourlyDayItem = candidateDayItem;
+              hourlyDayPayload = candidateDayPayload;
+              hourlyHourItem = candidateHourItem;
+              break;
+            }
+          }
+        }
+        if (!hourlyHourItem) {
+          hourlyHourItem = pickFirstSummaryHourItem(latestDayPayload?.hours || []) || liveHourItem;
+          hourlyDayItem = latestDayItem;
+          hourlyDayPayload = latestDayPayload;
+        }
+
+        let selectedDayItem = latestDayItem;
+        let selectedDayPayload = latestDayPayload;
+        let selectedHourItem = liveHourItem;
+        if (state.transcriptCard.mode === 'daily') {
+          selectedDayItem = dailyDayItem || latestDayItem;
+          selectedDayPayload = dailyDayPayload || latestDayPayload;
+          selectedHourItem = null;
+        } else if (state.transcriptCard.mode === 'hourly') {
+          selectedDayItem = hourlyDayItem || latestDayItem;
+          selectedDayPayload = hourlyDayPayload || latestDayPayload;
+          selectedHourItem = hourlyHourItem || null;
+        }
+
+        let hourPayload = null;
+        if (selectedHourItem && selectedDayPayload?.day) {
+          hourPayload = await fetchJson(
+            `/api/transcripts/hour?day=${encodeURIComponent(selectedDayPayload.day)}&hour=${encodeURIComponent(selectedHourItem.hour)}`,
+            { cache: 'no-store' }
+          );
+        }
+
+        state.transcriptCard.dayItem = selectedDayItem;
+        state.transcriptCard.dayPayload = selectedDayPayload;
+        state.transcriptCard.hourItem = selectedHourItem;
+        state.transcriptCard.hourPayload = hourPayload;
+        state.transcriptCard.error = '';
+        state.transcriptCard.refreshedAt = Date.now();
+      } catch (error) {
+        state.transcriptCard.error = error.message;
+      }
+      renderTranscriptCard();
+    }
+
+    function setTranscriptMode(mode) {
+      if (!mode || state.transcriptCard.mode === mode) return;
+      state.transcriptCard.mode = mode;
+      renderTranscriptCard();
+      loadTranscriptCard().catch(() => {});
+    }
+
+    function formatStorageBytes(bytes) {
+      const value = Number(bytes || 0);
+      if (!Number.isFinite(value) || value <= 0) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      let size = value;
+      let index = 0;
+      while (size >= 1024 && index < units.length - 1) {
+        size /= 1024;
+        index += 1;
+      }
+      const precision = size >= 10 || index === 0 ? 0 : 1;
+      return `${size.toFixed(precision)} ${units[index]}`;
+    }
+
+    function renderStorageStats(payload) {
+      if (!storageSummaryEl || !storageLocalEl || !storageSmbEl) return;
+      if (!payload || !payload.ok) {
+        storageSummaryEl.style.display = '';
+        storageLocalEl.className = 'storage-chip warn';
+        storageLocalEl.innerHTML = 'Local <strong>--</strong>';
+        storageSmbEl.className = 'storage-chip warn';
+        storageSmbEl.innerHTML = 'SMB <strong>--</strong>';
+        state.smbSourceAvailable = false;
+        syncRecordingSourceToggle();
+        return;
+      }
+      storageSummaryEl.style.display = '';
+      storageLocalEl.className = 'storage-chip ok';
+      storageLocalEl.innerHTML = `Local <strong>${payload.local_audio_files} files • ${formatStorageBytes(payload.local_total_bytes)}</strong>`;
+      if (!payload.smb_enabled) {
+        storageSmbEl.className = 'storage-chip';
+        storageSmbEl.innerHTML = 'SMB <strong>off</strong>';
+        state.smbSourceAvailable = false;
+        syncRecordingSourceToggle();
+        return;
+      }
+      if (!payload.smb_connected) {
+        storageSmbEl.className = 'storage-chip warn';
+        storageSmbEl.innerHTML = 'SMB <strong>unreachable</strong>';
+        state.smbSourceAvailable = false;
+        syncRecordingSourceToggle();
+        return;
+      }
+      storageSmbEl.className = 'storage-chip ok';
+      storageSmbEl.innerHTML = `SMB <strong>${payload.smb_audio_files} files • ${formatStorageBytes(payload.smb_total_bytes)}</strong>`;
+      state.smbSourceAvailable = true;
+      syncRecordingSourceToggle();
+    }
+
+    async function loadStorageStats() {
+      try {
+        const payload = await fetchJson('/api/storage/stats', { cache: 'no-store' });
+        renderStorageStats(payload);
+        if (state.recordingSource === 'smb' && !state.smbSourceAvailable) {
+          state.recordingSource = 'local';
+          syncRecordingSourceToggle();
+          await nav(state.currentFolderPath || '/');
+        }
+      } catch (_) {
+        renderStorageStats(null);
+        if (state.recordingSource === 'smb') {
+          state.recordingSource = 'local';
+          syncRecordingSourceToggle();
+          await nav(state.currentFolderPath || '/');
+        }
+      }
     }
 
     function renderSiteContent(payload) {
@@ -219,8 +1293,12 @@
       state.siteContent = payload;
       const callsign = readSiteValue(payload, 'site_callsign', DEFAULT_SITE_CALLSIGN);
       const tagline = readSiteValue(payload, 'site_tagline', DEFAULT_SITE_TAGLINE);
+      const uiTheme = readSiteValue(payload, 'ui_theme', 'dark');
       const infoTitle = readSiteValue(payload, 'site_info_title', DEFAULT_SITE_INFO_TITLE);
       const infoText = readSiteValue(payload, 'site_info_text', DEFAULT_SITE_INFO_TEXT);
+      if (window.HamVoxTheme) {
+        window.HamVoxTheme.applyTheme(uiTheme);
+      }
       siteCallsign.textContent = callsign;
       siteTagline.textContent = tagline;
       siteInfoTitle.textContent = infoTitle;
@@ -232,6 +1310,7 @@
       saveCachedSiteContent({
         site_callsign: callsign,
         site_tagline: tagline,
+        ui_theme: uiTheme,
         site_info_title: infoTitle,
         site_info_text: infoText,
       });
@@ -266,7 +1345,8 @@
     }
 
     function renderBreadcrumbs() {
-      crumbsEl.innerHTML = '<a href="#" data-path="/">Recordings</a>';
+      const rootLabel = state.recordingSource === 'smb' ? 'SMB Recordings' : 'Local Recordings';
+      crumbsEl.innerHTML = `<a href="#" data-path="/">${rootLabel}</a>`;
       qs('a', crumbsEl)?.addEventListener('click', async (event) => {
         event.preventDefault();
         await nav('/');
@@ -291,7 +1371,7 @@
       });
       audio.addEventListener('waiting', () => {
         const current = state.livePlayers.get(radioId);
-        if (current && current.state === 'playing') setLiveStateForRadio(radioId, 'connecting', 'Buffering…');
+        if (current && current.state === 'playing') setLiveStateForRadio(radioId, 'connecting', 'Buffering...');
       });
       audio.addEventListener('playing', () => setLiveStateForRadio(radioId, 'playing'));
       audio.addEventListener('error', () => {
@@ -317,22 +1397,22 @@
       card.classList.toggle('connecting', player.state === 'connecting');
       card.classList.toggle('playing', player.state === 'playing');
       if (player.state === 'connecting') {
-        button.textContent = '… Connecting';
+        button.textContent = '... Connecting';
         button.disabled = true;
         status.style.display = '';
         status.className = 'badge warn live-status';
-        status.textContent = player.message || 'Connecting…';
+        status.textContent = player.message || 'Connecting...';
         return;
       }
       button.disabled = false;
       if (player.state === 'playing') {
-        button.textContent = '■ Stop';
+        button.textContent = 'Stop';
         status.style.display = '';
         status.className = 'badge ok live-status';
         status.textContent = player.message || 'Playing';
         return;
       }
-      button.textContent = '▶ Play';
+      button.textContent = 'Play';
       if (player.message) {
         status.style.display = '';
         status.className = 'badge warn live-status';
@@ -361,11 +1441,11 @@
             <div class="text">
               <div class="title"><span class="badge">Live</span> ${radio.name}</div>
               <div class="meta">Live audio from ${radio.name}.</div>
-              <div class="status-row"><span class="badge warn live-status" style="display:none">Loading…</span></div>
+              <div class="status-row"><span class="badge warn live-status" style="display:none">Loading...</span></div>
             </div>
           </div>
           <div class="controls">
-            <button class="btn live-btn" type="button">▶ Play</button>
+            <button class="btn live-btn" type="button">Play</button>
             <input type="range" min="0" max="100" value="100" class="vol live-vol" aria-label="Volume" />
           </div>
         `;
@@ -538,7 +1618,7 @@
         if (!row) return;
         const pill = row.querySelector('.folder-pill');
         if (!pill) return;
-        const payload = await fetchJson(`/api/recordings?path=${encodeURIComponent(folderPath)}`);
+        const payload = await fetchJson(buildRecordingsListUrl(folderPath));
         const files = payload.items.filter((item) => item.type === 'file');
         const dirs = payload.items.filter((item) => item.type === 'dir');
         let totalFiles = files.length;
@@ -546,7 +1626,7 @@
         if (files.length === 0 && dirs.length > 0) {
           allPlayed = true;
           for (const dir of dirs) {
-            const sub = await fetchJson(`/api/recordings?path=${encodeURIComponent(`${payload.cwd === '/' ? '' : payload.cwd}/${dir.name}`)}`);
+            const sub = await fetchJson(buildRecordingsListUrl(`${payload.cwd === '/' ? '' : payload.cwd}/${dir.name}`));
             const subFiles = sub.items.filter((item) => item.type === 'file');
             totalFiles += subFiles.length;
             if (subFiles.length && !subFiles.every((file) => getLocalStatus(sub.cwd, file.name) === 'played')) {
@@ -598,8 +1678,8 @@
         if (!options.fromPlaylist) stopPlaylist();
         stopActiveRecording(true);
         if (previousKey) {
-          const [previousCwd, previousName] = previousKey.split('\n');
-          setLocalStatus(previousCwd, previousName, 'half');
+          const { source: previousSource, cwd: previousCwd, name: previousName } = parsePlaybackKey(previousKey);
+          setLocalStatus(previousCwd, previousName, 'half', previousSource);
           const previousRow = getRow(previousCwd, previousName);
           const previousPill = previousRow?.querySelector('.played .pill');
           if (previousPill) setPill(previousPill, 'half');
@@ -628,7 +1708,7 @@
 
     async function playFolderQueue(folderPath, rowNode, disclosure) {
       const currentToken = ++state.playlistToken;
-      const payload = await fetchJson(`/api/recordings?path=${encodeURIComponent(folderPath)}`);
+      const payload = await fetchJson(buildRecordingsListUrl(folderPath));
       if (!rowNode.nextElementSibling || !rowNode.nextElementSibling.classList.contains('childlist')) {
         await toggleFolder(folderPath, rowNode, disclosure);
       }
@@ -673,7 +1753,7 @@
       if (entry.type === 'dir') {
         const disclosure = document.createElement('span');
         disclosure.className = 'disclosure';
-        disclosure.textContent = '▸';
+        disclosure.textContent = '>';
         iconEl.appendChild(disclosure);
 
         const link = document.createElement('span');
@@ -687,10 +1767,7 @@
         folderPill.className = 'pill hidden folder-pill';
         playedEl.appendChild(folderPill);
 
-        const isDayFolder = cwd === '/' && isDayFolderName(entry.name);
-        if (!isDayFolder) {
-          actionsEl.appendChild(createButton('Play All', async () => playFolderQueue(folderPath, row, disclosure)));
-        }
+        actionsEl.appendChild(createButton('Play All', async () => playFolderQueue(folderPath, row, disclosure)));
         bindRowTap(row, async () => {
           await toggleFolder(folderPath, row, disclosure);
         });
@@ -725,13 +1802,13 @@
 
       const inline = document.createElement('div');
       inline.className = 'inrow-player';
-      inline.innerHTML = '<span class="time cur">0:00</span><input type="range" class="seek" min="0" max="1" value="0" step="0.01" aria-label="Seek" /><span class="time dur">—</span>';
+      inline.innerHTML = '<span class="time cur">0:00</span><input type="range" class="seek" min="0" max="1" value="0" step="0.01" aria-label="Seek" /><span class="time dur">--</span>';
       row.insertBefore(inline, playedEl);
 
       const curEl = qs('.cur', inline);
       const seekEl = qs('.seek', inline);
       const durEl = qs('.dur', inline);
-      const audio = new Audio(`/api/recordings/file?path=${encodeURIComponent(entry.path)}`);
+      const audio = new Audio(buildRecordingFileUrl(entry.path));
       audio.preload = 'metadata';
       row._audio = audio;
 
@@ -745,7 +1822,7 @@
         } else {
           seekEl.max = '1';
           seekEl.value = '0';
-          durEl.textContent = '—';
+          durEl.textContent = '--';
         }
         curEl.textContent = formatSeconds(current);
       };
@@ -774,7 +1851,7 @@
       sizeNode.textContent = sizeStr;
       const separator = document.createElement('span');
       separator.className = 'sep-dot';
-      separator.textContent = ' • ';
+      separator.textContent = ' | ';
       separator.style.display = 'none';
       const lengthNode = document.createElement('span');
       lengthNode.className = 'flen';
@@ -824,7 +1901,7 @@
       }));
       actionsEl.appendChild(createButton('Download', () => {
         const link = document.createElement('a');
-        link.href = `/api/recordings/file?path=${encodeURIComponent(entry.path)}`;
+        link.href = buildRecordingFileUrl(entry.path);
         link.download = entry.name;
         document.body.appendChild(link);
         link.click();
@@ -843,11 +1920,11 @@
       const next = rowNode.nextElementSibling;
       if (next && next.classList.contains('childlist')) {
         next.remove();
-        if (disclosure) disclosure.textContent = '▸';
+        if (disclosure) disclosure.textContent = '>';
         return;
       }
 
-      const payload = await fetchJson(`/api/recordings?path=${encodeURIComponent(path)}`);
+      const payload = await fetchJson(buildRecordingsListUrl(path));
       const wrap = document.createElement('div');
       wrap.className = 'childlist';
       const visibleItems = sortItems(payload.items.filter((item) => !(item.type === 'dir' && isHiddenFolder(item.name))));
@@ -861,13 +1938,14 @@
       }
 
       rowNode.insertAdjacentElement('afterend', wrap);
-      if (disclosure) disclosure.textContent = '▾';
+      if (disclosure) disclosure.textContent = 'v';
       updateRecordingPlaybackUi();
     }
 
     async function nav(path = '/') {
-      setStatus('Loading…');
-      const payload = await fetchJson(`/api/recordings?path=${encodeURIComponent(path)}`);
+      setStatus('Loading...');
+      const payload = await fetchJson(buildRecordingsListUrl(path));
+      state.currentFolderPath = payload.cwd || path || '/';
       renderBreadcrumbs();
       listEl.innerHTML = '';
       const visibleItems = sortItems(payload.items.filter((item) => !(item.type === 'dir' && isHiddenFolder(item.name))));
@@ -900,7 +1978,7 @@
       const card = qs(`.livecard[data-radio-id="${CSS.escape(radioId)}"]`, liveStreamsEl);
       const volumeValue = Number(qs('.live-vol', card)?.value || 100) / 100;
       player.audio.volume = volumeValue;
-      setLiveStateForRadio(radioId, 'connecting', 'Connecting…');
+      setLiveStateForRadio(radioId, 'connecting', 'Connecting...');
       try {
         await player.audio.play();
         setLiveStateForRadio(radioId, 'playing');
@@ -910,12 +1988,36 @@
       }
     }
 
+    transcriptModeTabsEl?.addEventListener('click', (event) => {
+      const button = event.target.closest('.transcript-mode-btn');
+      if (!button) return;
+      setTranscriptMode(button.dataset.mode || 'daily');
+    });
+
+    transcriptExpandBtnEl?.addEventListener('click', () => {
+      state.transcriptCard.expanded = !state.transcriptCard.expanded;
+      syncTranscriptExpandUi();
+    });
+
+    recordingSourceToggleEl?.addEventListener('click', async (event) => {
+      const button = event.target.closest('.recording-source-btn');
+      if (!button) return;
+      await setRecordingSource(button.dataset.source || 'local');
+    });
+
     (async () => {
       try {
         renderSiteContent(loadCachedSiteContent());
         const siteContent = await fetchJson('/api/site-content');
         renderSiteContent(siteContent);
+        renderTranscriptCard();
+        loadTranscriptCard();
+        loadStorageStats();
         await nav('/');
+        window.setInterval(() => {
+          if (state.transcriptCard.mode === 'live') loadTranscriptCard();
+        }, 15000);
+        window.setInterval(() => { loadStorageStats(); }, 60000);
       } catch (error) {
         setStatus(`Startup failed: ${error.message}`);
       }
@@ -923,3 +2025,8 @@
   </script>
 </body>
 </html>
+
+
+
+
+

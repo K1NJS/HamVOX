@@ -7,12 +7,13 @@ from backend.models.recording_configuration_models import (
     RecordingConfigurationUpdateRequest,
     SettingsBackupResponse,
     SiteContentResponse,
+    StorageStatsResponse,
     SmbConnectionStatusResponse,
     ThresholdTestResponse,
 )
 from backend.services.audio_capture_recording_service import AudioCaptureRecordingService
 from backend.services.recording_configuration_service import RecordingConfigurationService
-from backend.services.admin_auth_service import require_admin
+from backend.services.admin_auth_service import require_admin, require_public_if_enabled
 from backend.services.discord_webhook_service import DiscordWebhookService
 from backend.services.smb_backup_service import SmbBackupService
 
@@ -73,9 +74,22 @@ def get_smb_status() -> SmbConnectionStatusResponse:
 
 @router.post("/smb/connect", response_model=SmbConnectionStatusResponse, dependencies=[Depends(require_admin)])
 def connect_smb_share() -> SmbConnectionStatusResponse:
+    smb_service = SmbBackupService()
     configuration = RecordingConfigurationService().get_configuration()
-    status = SmbBackupService().connection_status(configuration)
+    status = smb_service.connection_status(configuration)
+    if status.get("connected"):
+        backfill = smb_service.backfill_local_to_backup(configuration)
+        status_message = str(status.get("message") or "Connected to SMB share.")
+        backfill_message = str(backfill.get("message") or "")
+        status["message"] = f"{status_message} {backfill_message}".strip()
     return SmbConnectionStatusResponse(**status)
+
+
+@router.get("/storage/stats", response_model=StorageStatsResponse, dependencies=[Depends(require_public_if_enabled)])
+def get_storage_stats() -> StorageStatsResponse:
+    configuration = RecordingConfigurationService().get_configuration()
+    payload = SmbBackupService().storage_stats(configuration)
+    return StorageStatsResponse(**payload)
 
 
 @router.post("/discord/test", response_model=DiscordWebhookTestResponse, dependencies=[Depends(require_admin)])
